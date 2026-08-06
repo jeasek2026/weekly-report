@@ -359,6 +359,46 @@
     .app-header{max-width:680px;margin:0 auto}
     .bottom-nav{max-width:680px;left:50%;transform:translateX(-50%)}
   }
+
+  /* ===== 移动端优化：字号层级、间距、布局 ===== */
+  @media(max-width:639px){
+    body{font-size:16px}
+    .card{padding:14px;margin-bottom:12px;border-radius:12px}
+    .card-title{font-size:16px;margin-bottom:12px}
+    .card-title .emoji{font-size:18px}
+    .field{margin-bottom:14px}
+    .field label{font-size:14px;margin-bottom:6px}
+    .field input,.field select,.field textarea{
+      padding:12px 14px;font-size:16px;line-height:1.6;border-radius:12px;
+    }
+    .field textarea{min-height:80px}
+    .record-item{padding:14px;margin-bottom:12px;border-radius:12px}
+    .record-item .ri-head{margin-bottom:10px}
+    .record-item .ri-num{font-size:14px}
+    .ri-tasktype{font-size:13px;padding:3px 10px}
+    .ri-important-toggle{font-size:13px;padding:4px 10px}
+    .ri-important-toggle .star{font-size:14px}
+    .ri-del{width:32px;height:32px;font-size:15px}
+    /* meta 行改为纵向堆叠，避免横向挤压 */
+    .ri-meta-row{flex-direction:column;gap:10px;margin-bottom:10px}
+    .ri-meta-row>.field{flex:none;width:100%}
+    .ri-plan-days{max-width:100%}
+    .ri-plan-days input{text-align:left}
+    .ri-link-sel{flex:none;width:100%}
+    .field-mini label{font-size:14px;margin-bottom:5px}
+    .field-mini input,
+    .field-mini select,
+    .field-mini textarea{padding:11px 13px;font-size:16px;line-height:1.6}
+    .ri-link-info{font-size:13px;padding:8px 12px;margin-bottom:10px;line-height:1.6}
+    .add-record-btn{padding:13px;font-size:15px}
+    .btn{padding:14px 20px;font-size:16px}
+    .btn-sm{padding:10px 14px;font-size:14px}
+    .view{padding:14px}
+    .app-header{padding:16px 14px 14px}
+    .app-header h1{font-size:19px}
+    .tab{padding:8px 14px;font-size:14px}
+    .icon-btn{width:40px;height:40px;font-size:18px}
+  }
 </style>
 </head>
 <body>
