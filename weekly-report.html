@@ -483,6 +483,13 @@
     </div>
     <div class="setting-item">
       <div>
+        <div class="si-lbl">☁️ 云端同步</div>
+        <div class="si-desc" id="cloudSyncStatus">手机电脑数据互通</div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="openCloudConfig()">配置</button>
+    </div>
+    <div class="setting-item">
+      <div>
         <div class="si-lbl">导出全部数据</div>
         <div class="si-desc">备份为表格文件</div>
       </div>
@@ -501,6 +508,45 @@
   </div>
 </div>
 
+<!-- 云端同步弹窗 -->
+<div class="modal-mask" id="cloudModal">
+  <div class="modal">
+    <h3>☁️ 云端同步设置</h3>
+    <div class="field">
+      <label>Gitee 用户名</label>
+      <input type="text" id="cfgOwner" placeholder="如 zhou-shuangxi2026">
+    </div>
+    <div class="field">
+      <label>仓库名</label>
+      <input type="text" id="cfgRepo" placeholder="如 weekly-report-data">
+    </div>
+    <div class="field">
+      <label>私人令牌</label>
+      <input type="password" id="cfgToken" placeholder="Gitee 私人令牌">
+    </div>
+    <div class="field">
+      <label>分支名</label>
+      <input type="text" id="cfgBranch" placeholder="master">
+    </div>
+    <div class="setting-item">
+      <div>
+        <div class="si-lbl">自动同步</div>
+        <div class="si-desc">保存数据时自动上传云端</div>
+      </div>
+      <div class="switch" id="cfgAutoSync" onclick="document.getElementById('cfgAutoSync').classList.toggle('on')"></div>
+    </div>
+    <div class="btn-row" style="margin:14px 0">
+      <button class="btn btn-success btn-sm" onclick="cloudSync('download')">⬇️ 从云端拉取</button>
+      <button class="btn btn-primary btn-sm" onclick="cloudSync('upload')">⬆️ 上传到云端</button>
+    </div>
+    <div id="cloudTestResult" style="font-size:12px;color:var(--text-light);min-height:18px;margin-bottom:8px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeCloudConfig()">取消</button>
+      <button class="btn btn-primary" onclick="saveCloudConfig()">保存配置</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -509,6 +555,127 @@ const DB = {
   get(key, def){ try{ const v = localStorage.getItem('wr_'+key); return v?JSON.parse(v):def; }catch(e){ return def; } },
   set(key, val){ localStorage.setItem('wr_'+key, JSON.stringify(val)); },
   del(key){ localStorage.removeItem('wr_'+key); }
+};
+
+/* ===================== Gitee 云端同步 ===================== */
+const Cloud = {
+  // 配置存储在 localStorage，首次使用预填用户提供的令牌
+  cfg: null,
+  fileSha: null,           // 云端文件的 SHA，更新时需要
+  uploading: false,
+  uploadTimer: null,
+  lastSyncAt: null,
+
+  loadCfg(){
+    if(this.cfg) return this.cfg;
+    this.cfg = DB.get('cloudCfg', {
+      token: '1c1c9836b1ce948a228cbf14d48364a5',
+      owner: 'zhou-shuangxi2026',
+      repo: 'weekly-report-data',
+      branch: 'master',
+      path: 'data.json',
+      autoSync: true
+    });
+    return this.cfg;
+  },
+  saveCfg(c){ this.cfg = c; DB.set('cloudCfg', c); },
+  enabled(){ const c = this.loadCfg(); return !!(c.token && c.owner && c.repo); },
+
+  api(path, method, body){
+    const c = this.loadCfg();
+    const base = 'https://gitee.com/api/v5/repos/' + c.owner + '/' + c.repo + '/contents/' + encodeURIComponent(c.path);
+    let url = base + '?access_token=' + encodeURIComponent(c.token) + '&ref=' + encodeURIComponent(c.branch);
+    const opts = { method: method || 'GET', headers: {'Content-Type':'application/json'} };
+    if(body){
+      body.access_token = c.token;
+      body.branch = c.branch;
+      opts.body = JSON.stringify(body);
+    }
+    return fetch(url, opts).then(r => {
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  },
+
+  // 收集所有 wr_ 开头的本地数据
+  collectAll(){
+    const all = {};
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && k.indexOf('wr_')===0 && k !== 'wr_cloudCfg'){
+        try{ all[k] = JSON.parse(localStorage.getItem(k)); }catch(e){}
+      }
+    }
+    all.__updatedAt = new Date().toISOString();
+    all.__device = navigator.userAgent;
+    return all;
+  },
+
+  // 上传：先获取 SHA（文件存在则更新，不存在则创建）
+  upload(msg){
+    if(!this.enabled()){ return Promise.reject('未配置云端'); }
+    if(this.uploading){ return Promise.resolve('skip'); }
+    this.uploading = true;
+    const data = this.collectAll();
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+    const message = msg || ('更新工作记录 ' + new Date().toLocaleString('zh-CN'));
+
+    return this.api('', 'GET').then(res => {
+      // 文件已存在，更新
+      this.fileSha = res.sha;
+      return this.api('', 'PUT', { content, message, sha: res.sha });
+    }).catch(e => {
+      // 文件不存在（404），创建
+      return this.api('', 'POST', { content, message });
+    }).then(res => {
+      this.fileSha = res.content && res.content.sha;
+      this.lastSyncAt = new Date();
+      this.uploading = false;
+      return 'ok';
+    }).catch(e => {
+      this.uploading = false;
+      throw e;
+    });
+  },
+
+  // 下载：获取云端文件并写入本地（合并策略：云端覆盖本地，但保留本地锁屏配置）
+  download(){
+    if(!this.enabled()){ return Promise.reject('未配置云端'); }
+    return this.api('', 'GET').then(res => {
+      this.fileSha = res.sha;
+      if(!res.content) throw new Error('云端无数据');
+      const json = decodeURIComponent(escape(atob(res.content.replace(/\s/g,''))));
+      const data = JSON.parse(json);
+      // 保留本地锁屏配置
+      const localLock = DB.get('lockCfg', null);
+      const localCloud = DB.get('cloudCfg', null);
+      // 清空旧数据（保留 cloudCfg 和 lockCfg）
+      const keep = {};
+      if(localLock) keep['wr_lockCfg'] = JSON.stringify(localLock);
+      if(localCloud) keep['wr_cloudCfg'] = JSON.stringify(localCloud);
+      Object.keys(localStorage).filter(k => k.indexOf('wr_')===0).forEach(k => {
+        if(k !== 'wr_lockCfg' && k !== 'wr_cloudCfg') localStorage.removeItem(k);
+      });
+      // 写入云端数据
+      Object.keys(data).forEach(k => {
+        if(k === '__updatedAt' || k === '__device') return;
+        if(k === 'wr_lockCfg' && localLock) return; // 不覆盖锁屏
+        if(k === 'wr_cloudCfg' && localCloud) return; // 不覆盖配置
+        localStorage.setItem(k, JSON.stringify(data[k]));
+      });
+      this.lastSyncAt = new Date();
+      return 'ok';
+    });
+  },
+
+  // 防抖自动上传
+  scheduleUpload(msg){
+    if(!this.enabled() || !this.loadCfg().autoSync) return;
+    clearTimeout(this.uploadTimer);
+    this.uploadTimer = setTimeout(() => {
+      this.upload(msg).catch(e => console.warn('自动上传失败:', e.message));
+    }, 1500);
+  }
 };
 
 /* ===================== 全局状态 ===================== */
@@ -572,6 +739,16 @@ function enterApp(){
   document.getElementById('app').style.display='block';
   document.getElementById('bottomNav').style.display='flex';
   initApp();
+  // 进入应用后自动从云端同步最新数据
+  if(Cloud.enabled()){
+    Cloud.download().then(()=>{
+      showToast('✓ 已从云端同步最新数据');
+      initApp(); // 重新加载界面
+    }).catch(e=>{
+      // 云端无数据或其他错误，静默处理（首次使用正常情况）
+      console.log('云端同步跳过:', e.message);
+    });
+  }
 }
 
 function shake(el){ el.style.animation='none'; void el.offsetWidth; el.style.animation='shake .4s'; }
@@ -637,6 +814,71 @@ function renderSettings(){
   document.getElementById('setLockMode').value=lockCfg.mode||'password';
   document.getElementById('setPwdRow').style.display = lockCfg.mode==='password'?'flex':'none';
   document.getElementById('setGestureRow').style.display = lockCfg.mode==='gesture'?'flex':'none';
+  // 云端状态
+  const st = document.getElementById('cloudSyncStatus');
+  if(Cloud.enabled()){
+    const c = Cloud.loadCfg();
+    const t = Cloud.lastSyncAt ? ('｜上次同步 '+Cloud.lastSyncAt.toLocaleTimeString('zh-CN')) : '';
+    st.textContent = '已连接 '+c.owner+'/'+c.repo + t;
+    st.style.color = 'var(--success)';
+  }else{
+    st.textContent = '未配置，点击配置开启手机电脑同步';
+    st.style.color = 'var(--text-light)';
+  }
+}
+
+/* ----- 云端同步 ----- */
+function openCloudConfig(){
+  const c = Cloud.loadCfg();
+  document.getElementById('cfgOwner').value = c.owner||'';
+  document.getElementById('cfgRepo').value = c.repo||'';
+  document.getElementById('cfgToken').value = c.token||'';
+  document.getElementById('cfgBranch').value = c.branch||'master';
+  document.getElementById('cfgAutoSync').classList.toggle('on', c.autoSync!==false);
+  document.getElementById('cloudTestResult').textContent='';
+  document.getElementById('cloudModal').classList.add('show');
+}
+function closeCloudConfig(){ document.getElementById('cloudModal').classList.remove('show'); }
+function saveCloudConfig(){
+  const c = {
+    owner: document.getElementById('cfgOwner').value.trim(),
+    repo: document.getElementById('cfgRepo').value.trim(),
+    token: document.getElementById('cfgToken').value.trim(),
+    branch: document.getElementById('cfgBranch').value.trim()||'master',
+    path: 'data.json',
+    autoSync: document.getElementById('cfgAutoSync').classList.contains('on')
+  };
+  if(!c.owner||!c.repo||!c.token){ showToast('请填写完整配置'); return; }
+  Cloud.saveCfg(c);
+  closeCloudConfig();
+  renderSettings();
+  showToast('✓ 云端配置已保存');
+}
+function cloudSync(action){
+  const r = document.getElementById('cloudTestResult');
+  r.style.color='var(--text-light)';
+  r.textContent = action==='download'?'⏳ 正在从云端拉取...':'⏳ 正在上传到云端...';
+  if(action==='download'){
+    Cloud.download().then(()=>{
+      r.style.color='var(--success)';
+      r.textContent='✓ 拉取成功，即将刷新页面';
+      showToast('✓ 云端数据已同步');
+      setTimeout(()=>location.reload(),1000);
+    }).catch(e=>{
+      r.style.color='var(--danger)';
+      r.textContent='✗ 拉取失败：'+e.message;
+    });
+  }else{
+    Cloud.upload().then(res=>{
+      if(res==='skip'){ r.style.color='var(--warning)'; r.textContent='⏸ 上传进行中，请稍候'; return; }
+      r.style.color='var(--success)';
+      r.textContent='✓ 上传成功 '+new Date().toLocaleTimeString('zh-CN');
+      renderSettings();
+    }).catch(e=>{
+      r.style.color='var(--danger)';
+      r.textContent='✗ 上传失败：'+e.message;
+    });
+  }
 }
 function toggleLockEnabled(){
   if(!lockCfg.enabled){
@@ -771,6 +1013,7 @@ function saveProfile(){
   if(!pf.name){showToast('请填写姓名');return;}
   DB.set('profile',pf);
   document.getElementById('positionHintCard').style.display='none';
+  Cloud.scheduleUpload('保存岗位信息');
   showToast('岗位信息已保存');
 }
 function val(id){return document.getElementById(id).value.trim();}
@@ -840,6 +1083,7 @@ function saveDaily(){
   };
   DB.set('daily_'+state.curDate,data);
   updateIndex(state.curDate);
+  Cloud.scheduleUpload('保存 '+state.curDate+' 记录');
   showToast('✓ 已保存 '+state.curDate);
 }
 function updateIndex(date){
@@ -1027,6 +1271,7 @@ function buildWeeklyHTML(start,end,data){
 function saveWeeklyPlan(weekKey){
   const v=document.getElementById('weeklyPlanInput').value;
   DB.set('plan_week_'+weekKey,v);
+  Cloud.scheduleUpload('保存下周计划');
   showToast('✓ 下周计划已保存');
 }
 function generateAnalysis(days,records,field,rate,data){
@@ -1155,6 +1400,7 @@ function buildMonthlyHTML(ym,data){
 function saveMonthlyPlan(monthKey){
   const v=document.getElementById('monthlyPlanInput').value;
   DB.set('plan_month_'+monthKey,v);
+  Cloud.scheduleUpload('保存下月计划');
   showToast('✓ 下月计划已保存');
 }
 function generateMonthAnalysis(days,records,field,rate,weeks){
@@ -1276,6 +1522,9 @@ window.addEventListener('DOMContentLoaded',()=>{
   // 点击遮罩关闭弹窗
   document.getElementById('settingsModal').addEventListener('click',e=>{
     if(e.target.id==='settingsModal')closeSettings();
+  });
+  document.getElementById('cloudModal').addEventListener('click',e=>{
+    if(e.target.id==='cloudModal')closeCloudConfig();
   });
 });
 </script>
