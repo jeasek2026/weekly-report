@@ -110,19 +110,19 @@
     background:var(--card);border-radius:var(--radius);padding:16px;
     box-shadow:var(--shadow);margin-bottom:14px;
   }
-  .card-title{font-size:15px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px}
-  .card-title .emoji{font-size:18px}
-  .field{margin-bottom:12px}
-  .field label{display:block;font-size:13px;color:var(--text-light);margin-bottom:5px;font-weight:500}
+  .card-title{font-size:16px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+  .card-title .emoji{font-size:19px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:13px;color:var(--text-light);margin-bottom:6px;font-weight:500;letter-spacing:.2px}
   .field input,.field select,.field textarea{
     width:100%;padding:11px 13px;border:1px solid var(--border);border-radius:var(--radius-sm);
     font-size:15px;font-family:inherit;background:#fff;color:var(--text);outline:none;
-    transition:border .2s;
+    transition:border .2s;line-height:1.5;
   }
   .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--primary)}
-  .field textarea{resize:vertical;min-height:64px}
+  .field textarea{resize:vertical;min-height:72px;line-height:1.6}
 
-  .row2{display:flex;gap:10px}
+  .row2{display:flex;gap:12px}
   .row2>.field{flex:1}
 
   /* 开关 */
@@ -156,34 +156,38 @@
 
   /* 工作记录条目 */
   .record-item{
-    border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;
-    margin-bottom:10px;background:#fafbfc;position:relative;
+    border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;
+    margin-bottom:12px;background:#fafbfc;position:relative;
   }
   .record-item.is-important{
     border-color:#f59e0b;background:#fffbeb;
     box-shadow:0 0 0 1px rgba(245,158,11,.3);
   }
-  .record-item .ri-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px}
-  .record-item .ri-head-left{display:flex;align-items:center;gap:8px;min-width:0}
-  .record-item .ri-num{font-size:12px;color:var(--text-light);font-weight:600}
+  .record-item .ri-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px}
+  .record-item .ri-head-left{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
+  .record-item .ri-num{font-size:13px;color:var(--text-light);font-weight:600;letter-spacing:.3px}
   .ri-tasktype{
-    display:inline-block;font-size:11px;font-weight:600;
-    padding:2px 8px;border-radius:10px;letter-spacing:.3px;
+    display:inline-block;font-size:12px;font-weight:600;
+    padding:3px 10px;border-radius:10px;letter-spacing:.3px;line-height:1.4;
   }
   .ri-important-toggle{
     display:inline-flex;align-items:center;gap:4px;cursor:pointer;
     font-size:12px;color:var(--text-light);user-select:none;
-    padding:3px 8px;border-radius:12px;background:#f3f4f6;transition:.2s;
+    padding:4px 10px;border-radius:12px;background:#f3f4f6;transition:.2s;line-height:1.4;
   }
   .ri-important-toggle.on{
     background:#fef3c7;color:#b45309;font-weight:600;
   }
-  .ri-important-toggle .star{font-size:14px}
+  .ri-important-toggle .star{font-size:13px}
   .ri-del{
-    width:26px;height:26px;border-radius:8px;border:none;background:#fee2e2;color:var(--danger);
-    font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    width:28px;height:28px;border-radius:8px;border:none;background:#fee2e2;color:var(--danger);
+    font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;
   }
-  .field-mini input{padding:9px 11px;font-size:14px}
+  /* 缩小版字段：统一 select/input/textarea 的字号与间距，消除字体大小不一致 */
+  .field-mini label{font-size:12px;margin-bottom:4px}
+  .field-mini input,
+  .field-mini select,
+  .field-mini textarea{padding:9px 11px;font-size:14px;line-height:1.5}
 
   /* 休息日提示 */
   .rest-day-banner{
@@ -202,17 +206,17 @@
   .rest-day-banner .rest-toggle.on{background:#92400e;color:#fff;border-color:#92400e}
 
   /* 计划天数与关联任务 */
-  .ri-meta-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .ri-meta-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
   .ri-meta-row>.field{flex:1;min-width:80px;margin-bottom:0}
   .ri-plan-days{max-width:90px}
-  .ri-plan-days input{padding:8px 10px;font-size:13px;text-align:center}
+  .ri-plan-days input{padding:8px 10px;text-align:center}
   .ri-link-sel{flex:2;min-width:160px}
-  .ri-link-sel select{padding:8px 10px;font-size:13px}
+  .ri-link-sel select{padding:8px 10px}
   .ri-link-info{
-    font-size:11px;color:#0e7490;background:#ecfeff;border:1px solid #cffafe;
-    padding:4px 8px;border-radius:6px;margin-bottom:6px;line-height:1.5;
+    font-size:12px;color:#0e7490;background:#ecfeff;border:1px solid #cffafe;
+    padding:6px 10px;border-radius:8px;margin-bottom:8px;line-height:1.55;
   }
-  .ri-link-info .chain-tag{font-weight:600}
+  .ri-link-info .chain-tag{font-weight:600;margin-right:4px}
 
   /* 甘特图 */
   .gantt-wrap{overflow-x:auto;margin-top:8px;-webkit-overflow-scrolling:touch}
@@ -240,9 +244,9 @@
   .gantt-legend-dot{width:12px;height:12px;border-radius:3px}
 
   .add-record-btn{
-    width:100%;padding:11px;border:1.5px dashed var(--primary);border-radius:var(--radius-sm);
+    width:100%;padding:12px;border:1.5px dashed var(--primary);border-radius:var(--radius-sm);
     background:var(--primary-light);color:var(--primary);font-size:14px;font-weight:600;
-    cursor:pointer;margin-top:4px;
+    cursor:pointer;margin-top:4px;letter-spacing:.5px;
   }
 
   /* 外勤卡片 */
