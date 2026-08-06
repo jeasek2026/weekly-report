@@ -513,6 +513,10 @@
   <div class="modal">
     <h3>☁️ 云端同步设置</h3>
     <div class="field">
+      <label>使用者用户名（用于多人数据隔离）</label>
+      <input type="text" id="cfgUserId" placeholder="如：张三、zhangsan">
+    </div>
+    <div class="field">
       <label>Gitee 用户名</label>
       <input type="text" id="cfgOwner" placeholder="如 zhou-shuangxi2026">
     </div>
@@ -573,17 +577,24 @@ const Cloud = {
       owner: 'zhou-shuangxi2026',
       repo: 'weekly-report-data',
       branch: 'master',
-      path: 'data.json',
+      userId: '',           // 使用者用户名，用于数据隔离
       autoSync: true
     });
     return this.cfg;
   },
   saveCfg(c){ this.cfg = c; DB.set('cloudCfg', c); },
-  enabled(){ const c = this.loadCfg(); return !!(c.token && c.owner && c.repo); },
-
-  api(path, method, body){
+  // 数据文件路径：data_{用户名}.json，实现多人数据隔离
+  filePath(){
     const c = this.loadCfg();
-    const base = 'https://gitee.com/api/v5/repos/' + c.owner + '/' + c.repo + '/contents/' + encodeURIComponent(c.path);
+    const uid = (c.userId||'').trim();
+    return uid ? ('data_' + uid + '.json') : 'data.json';
+  },
+  enabled(){ const c = this.loadCfg(); return !!(c.token && c.owner && c.repo && c.userId); },
+
+  api(method, body){
+    const c = this.loadCfg();
+    const path = this.filePath();
+    const base = 'https://gitee.com/api/v5/repos/' + c.owner + '/' + c.repo + '/contents/' + encodeURIComponent(path);
     let url = base + '?access_token=' + encodeURIComponent(c.token) + '&ref=' + encodeURIComponent(c.branch);
     const opts = { method: method || 'GET', headers: {'Content-Type':'application/json'} };
     if(body){
@@ -620,13 +631,13 @@ const Cloud = {
     const content = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
     const message = msg || ('更新工作记录 ' + new Date().toLocaleString('zh-CN'));
 
-    return this.api('', 'GET').then(res => {
+    return this.api('GET').then(res => {
       // 文件已存在，更新
       this.fileSha = res.sha;
-      return this.api('', 'PUT', { content, message, sha: res.sha });
+      return this.api('PUT', { content, message, sha: res.sha });
     }).catch(e => {
       // 文件不存在（404），创建
-      return this.api('', 'POST', { content, message });
+      return this.api('POST', { content, message });
     }).then(res => {
       this.fileSha = res.content && res.content.sha;
       this.lastSyncAt = new Date();
@@ -641,7 +652,7 @@ const Cloud = {
   // 下载：获取云端文件并写入本地（合并策略：云端覆盖本地，但保留本地锁屏配置）
   download(){
     if(!this.enabled()){ return Promise.reject('未配置云端'); }
-    return this.api('', 'GET').then(res => {
+    return this.api('GET').then(res => {
       this.fileSha = res.sha;
       if(!res.content) throw new Error('云端无数据');
       const json = decodeURIComponent(escape(atob(res.content.replace(/\s/g,''))));
@@ -739,6 +750,16 @@ function enterApp(){
   document.getElementById('app').style.display='block';
   document.getElementById('bottomNav').style.display='flex';
   initApp();
+  // 首次使用：未设置使用者用户名时，自动弹出云端配置
+  const c = Cloud.loadCfg();
+  if(!c.userId){
+    setTimeout(()=>{
+      showToast('请先设置使用者用户名');
+      openSettings();
+      setTimeout(()=>openCloudConfig(), 300);
+    }, 400);
+    return;
+  }
   // 进入应用后自动从云端同步最新数据
   if(Cloud.enabled()){
     Cloud.download().then(()=>{
@@ -816,11 +837,14 @@ function renderSettings(){
   document.getElementById('setGestureRow').style.display = lockCfg.mode==='gesture'?'flex':'none';
   // 云端状态
   const st = document.getElementById('cloudSyncStatus');
-  if(Cloud.enabled()){
-    const c = Cloud.loadCfg();
+  const c = Cloud.loadCfg();
+  if(c.userId && c.token && c.owner && c.repo){
     const t = Cloud.lastSyncAt ? ('｜上次同步 '+Cloud.lastSyncAt.toLocaleTimeString('zh-CN')) : '';
-    st.textContent = '已连接 '+c.owner+'/'+c.repo + t;
+    st.textContent = '用户：'+c.userId+'｜已连接 '+c.owner+'/'+c.repo + t;
     st.style.color = 'var(--success)';
+  }else if(c.token && c.owner && c.repo){
+    st.textContent = '未设置使用者用户名，点击配置';
+    st.style.color = 'var(--warning)';
   }else{
     st.textContent = '未配置，点击配置开启手机电脑同步';
     st.style.color = 'var(--text-light)';
@@ -830,6 +854,7 @@ function renderSettings(){
 /* ----- 云端同步 ----- */
 function openCloudConfig(){
   const c = Cloud.loadCfg();
+  document.getElementById('cfgUserId').value = c.userId||'';
   document.getElementById('cfgOwner').value = c.owner||'';
   document.getElementById('cfgRepo').value = c.repo||'';
   document.getElementById('cfgToken').value = c.token||'';
@@ -841,14 +866,15 @@ function openCloudConfig(){
 function closeCloudConfig(){ document.getElementById('cloudModal').classList.remove('show'); }
 function saveCloudConfig(){
   const c = {
+    userId: document.getElementById('cfgUserId').value.trim(),
     owner: document.getElementById('cfgOwner').value.trim(),
     repo: document.getElementById('cfgRepo').value.trim(),
     token: document.getElementById('cfgToken').value.trim(),
     branch: document.getElementById('cfgBranch').value.trim()||'master',
-    path: 'data.json',
     autoSync: document.getElementById('cfgAutoSync').classList.contains('on')
   };
-  if(!c.owner||!c.repo||!c.token){ showToast('请填写完整配置'); return; }
+  if(!c.userId){ showToast('请填写使用者用户名'); return; }
+  if(!c.owner||!c.repo||!c.token){ showToast('请填写完整 Gitee 配置'); return; }
   Cloud.saveCfg(c);
   closeCloudConfig();
   renderSettings();
