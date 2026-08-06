@@ -218,13 +218,13 @@
   .gantt-wrap{overflow-x:auto;margin-top:8px;-webkit-overflow-scrolling:touch}
   .gantt-chart{min-width:100%;font-size:11px}
   .gantt-header{display:flex;border-bottom:2px solid var(--border);position:sticky;top:0;background:#fff;z-index:1}
-  .gantt-task-col{width:120px;min-width:120px;padding:6px 8px;font-weight:600;color:var(--text);border-right:1px solid var(--border);flex-shrink:0;position:sticky;left:0;background:#fff;z-index:2}
+  .gantt-task-col{width:180px;min-width:180px;padding:6px 8px;font-weight:600;color:var(--text);border-right:1px solid var(--border);flex-shrink:0;position:sticky;left:0;background:#fff;z-index:2}
   .gantt-day-header{flex:1;min-width:28px;text-align:center;padding:6px 0;color:var(--text-light);border-right:1px solid var(--border)}
   .gantt-day-header.weekend{background:#fef3c7;color:#92400e}
   .gantt-day-header.today{background:var(--primary-light);color:var(--primary);font-weight:600}
   .gantt-row{display:flex;border-bottom:1px solid var(--border);align-items:center;min-height:32px}
   .gantt-row:nth-child(even){background:#fafbfc}
-  .gantt-task-name{width:120px;min-width:120px;padding:4px 8px;font-size:11px;color:var(--text);border-right:1px solid var(--border);flex-shrink:0;position:sticky;left:0;background:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:2}
+  .gantt-task-name{width:180px;min-width:180px;padding:4px 8px;font-size:11px;color:var(--text);border-right:1px solid var(--border);flex-shrink:0;position:sticky;left:0;background:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:2}
   .gantt-task-name .gantt-star{color:#f59e0b}
   .gantt-cells{flex:1;display:flex;position:relative}
   .gantt-cell{flex:1;min-width:28px;border-right:1px solid #f3f4f6;min-height:32px}
@@ -233,19 +233,11 @@
     position:absolute;top:50%;transform:translateY(-50%);
     height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;
     font-size:10px;color:#fff;font-weight:600;overflow:hidden;white-space:nowrap;
-    box-shadow:0 1px 2px rgba(0,0,0,.15);
+    box-shadow:0 1px 2px rgba(0,0,0,.15);transition:opacity .2s;
   }
-  .gantt-bar.done{background:linear-gradient(90deg,#10b981,#059669)}
-  .gantt-bar.progress{background:linear-gradient(90deg,#3b82f6,#2563eb)}
-  .gantt-bar.late{background:linear-gradient(90deg,#ef4444,#dc2626)}
-  .gantt-bar.planned{background:linear-gradient(90deg,#9ca3af,#6b7280)}
-  .gantt-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--text-light)}
+  .gantt-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--text-light)}
   .gantt-legend-item{display:flex;align-items:center;gap:4px}
   .gantt-legend-dot{width:12px;height:12px;border-radius:3px}
-  .gantt-legend-dot.done{background:#10b981}
-  .gantt-legend-dot.progress{background:#3b82f6}
-  .gantt-legend-dot.late{background:#ef4444}
-  .gantt-legend-dot.planned{background:#9ca3af}
 
   .add-record-btn{
     width:100%;padding:11px;border:1.5px dashed var(--primary);border-radius:var(--radius-sm);
@@ -1326,7 +1318,7 @@ function getRecentUndoneTasks(days,beforeDate){
       if(!r.plan)return;
       // 确保有 taskId（旧数据可能没有）
       const tid=r.taskId||('T_'+dateStr+'_'+idx);
-      const done=!!(r.progress&&(r.progress.includes('100')||/已完成/.test(r.progress)));
+      const done=isRecordDone(r);
       result.push({
         date:dateStr,plan:r.plan,progress:r.progress,
         taskId:tid,isImportant:!!r.isImportant,isDone:done,
@@ -1732,19 +1724,24 @@ function extractImportantRecords(data){
 /* ===================== 任务链追踪与完成率判定 ===================== */
 /* 判断单条记录是否已完成 */
 function isRecordDone(r){
-  return !!(r.progress&&(r.progress.includes('100')||/已完成/.test(r.progress)));
+  if(!r.progress)return false;
+  if(r.progress.includes('100'))return true;
+  if(r.progress.includes('完成')&&!r.progress.includes('未完成'))return true;
+  return false;
 }
 /* 构建任务链：通过 linkedTaskId 关联，将跨天记录串联成任务链 */
 function buildTaskChains(data){
   // 1. 扁平化所有记录
   const allItems=[];
   data.forEach(d=>{
-    (d.records||[]).forEach(r=>{
+    (d.records||[]).forEach((r,idx)=>{
       if(!r.plan&&!r.progress&&!r.result)return;
       allItems.push({
         date:d.date,plan:r.plan,progress:r.progress,result:r.result,
         isImportant:!!r.isImportant,planDays:r.planDays||1,
-        taskId:r.taskId||'',linkedTaskId:r.linkedTaskId||'',
+        // 旧数据可能没有 taskId，生成与 getRecentUndoneTasks 一致的临时ID，确保链可正确关联
+        taskId:r.taskId||('T_'+d.date+'_'+idx),linkedTaskId:r.linkedTaskId||'',
+        taskStatus:r.taskStatus||'',
         isRestDay:d.isRestDay===true
       });
     });
@@ -1776,20 +1773,43 @@ function buildTaskChains(data){
       const startDate=chain[0].date;
       const endDate=chain[chain.length-1].date;
       const spanDays=Math.round((new Date(endDate)-new Date(startDate))/86400000)+1;
-      const lastDone=isRecordDone(chain[chain.length-1]);
+      const lastItem=chain[chain.length-1];
+      // 链尾完成判定：
+      // - 跨天链：用户手动选"持续任务[结束]"（taskStatus==='end'）即视为链完成，否则回退到进度文本
+      // - 当日任务（单日链）：仅看进度文本，无 taskStatus 判定
+      const lastDone=chain.length>1
+        ? (lastItem.taskStatus==='end'||isRecordDone(lastItem))
+        : isRecordDone(lastItem);
       const anyDone=chain.some(isRecordDone);
       const totalPlanDays=chain.reduce((s,c)=>s+(c.planDays||1),0);
+      // 确定链的任务状态类型
+      let chainStatus='daily';
+      if(chain.length>1){
+        // 跨天链：根据链尾状态确定
+        chainStatus=lastDone?'end':'continue';
+      }else{
+        // 单日：根据 taskStatus 或 planDays 判断
+        const st=chain[0].taskStatus;
+        if(st&&['daily','start','continue','end'].includes(st)){
+          chainStatus=st;
+        }else if((chain[0].planDays||1)>1){
+          chainStatus='start';
+        }else{
+          chainStatus='daily';
+        }
+      }
       chains.push({
         items:chain,
         startDate:startDate,endDate:endDate,
         spanDays:spanDays,
         planDays:totalPlanDays,
-        isDone:lastDone,            // 以链尾状态为准
-        isOverdue:spanDays>totalPlanDays, // 实际天数超过计划天数
+        isDone:lastDone,
+        isOverdue:spanDays>totalPlanDays,
         isCrossDay:chain.length>1,
         hasReason:chainHasReason(chain),
         mainPlan:chain[0].plan||chain[chain.length-1].plan||'',
-        isImportant:chain.some(c=>c.isImportant)
+        isImportant:chain.some(c=>c.isImportant),
+        taskStatus:chainStatus
       });
     }
   });
@@ -1878,6 +1898,8 @@ function analyzeWorkLinkage(data,importantRecords){
 /* 生成下一步工作方向指导 */
 function generateDirectionGuidance(data,linkage,importantRecords,problems,catStats,crossDayTasks){
   const guidance=[];
+  // 构建任务链，用于判断重要任务是否真正未完成（链尾完成即视为完成）
+  const allChains=buildTaskChains(data);
   // 0. 基于跨天延续任务分析
   if(crossDayTasks&&crossDayTasks.length>0){
     const overdue=crossDayTasks.filter(c=>c.isOverdue);
@@ -1901,12 +1923,13 @@ function generateDirectionGuidance(data,linkage,importantRecords,problems,catSta
       guidance.push('  · 关联前序任务时同步填写当日进展与阻塞点。');
     }
   }
-  // 1. 基于未完成的重要任务
-  const undoneImportant=importantRecords.filter(it=>!(it.progress&&(it.progress.includes('完成')||it.progress.includes('100'))));
-  if(undoneImportant.length>0){
-    guidance.push('【重点跟进】以下 '+undoneImportant.length+' 项重要任务尚未完成，下月应作为首要推进事项：');
-    undoneImportant.slice(0,5).forEach(it=>{
-      guidance.push('  · '+it.date+'：'+(it.plan||'').substring(0,40)+(it.plan&&it.plan.length>40?'...':''));
+  // 1. 基于未完成的重要任务（按任务链判定：链尾完成即视为已完成）
+  // 直接从任务链中提取未完成的重要任务链，每条链只显示一次（避免同链多记录重复列出）
+  const undoneImportantChains=allChains.filter(c=>c.isImportant && !c.isDone);
+  if(undoneImportantChains.length>0){
+    guidance.push('【重点跟进】以下 '+undoneImportantChains.length+' 项重要任务尚未完成，下月应作为首要推进事项：');
+    undoneImportantChains.slice(0,5).forEach(c=>{
+      guidance.push('  · '+c.endDate+'：'+(c.mainPlan||'').substring(0,40)+(c.mainPlan&&c.mainPlan.length>40?'...':''));
     });
   }
   // 2. 基于工作主线延续
@@ -1937,7 +1960,15 @@ function generateDirectionGuidance(data,linkage,importantRecords,problems,catSta
       }
     }
   }
-  // 6. 通用建议
+  // 6. 超期任务提醒（已完成但超期太多，建议复盘）
+  const overdueDoneChains=allChains.filter(c=>c.isDone && c.isOverdue && (c.spanDays - c.planDays) >= 2);
+  if(overdueDoneChains.length>0){
+    guidance.push('【超期完成提醒】以下 '+overdueDoneChains.length+' 项任务虽已完成，但实际耗时明显超出计划，建议复盘：');
+    overdueDoneChains.slice(0,3).forEach(c=>{
+      guidance.push('  · '+(c.mainPlan||'').substring(0,30)+'：计划 '+c.planDays+' 天，实际 '+c.spanDays+' 天');
+    });
+  }
+  // 7. 通用建议
   if(guidance.length===0){
     guidance.push('【常规推进】本月工作整体平稳，建议下月继续保持现有节奏，同时主动寻找可优化点，提升工作产出质量。');
   }
@@ -1969,63 +2000,68 @@ function buildGanttHTML(chains,periodStart,periodEnd){
   if(!chains||chains.length===0){
     return '<div style="font-size:13px;color:var(--text-light);text-align:center;padding:16px">暂无任务数据</div>';
   }
-  // 生成日期序列
   const days=[];
   const start=new Date(periodStart),end=new Date(periodEnd);
   for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){
     days.push(d.toISOString().slice(0,10));
   }
   const totalDays=days.length;
-  // 每天宽度百分比
   const dayWidth=100/totalDays;
   const todayStr=new Date().toISOString().slice(0,10);
-  // 表头
+  // 任务状态类型配色
+  const statusColorMap={
+    'daily':'#6366f1','start':'#3b82f6','continue':'#f59e0b','end':'#10b981'
+  };
+  const statusLabelMap={'daily':'当日','start':'开始','continue':'持续','end':'结束'};
   let html='<div class="gantt-wrap"><div class="gantt-chart">';
-  html+='<div class="gantt-header"><div class="gantt-task-col">任务名称</div>';
+  html+='<div class="gantt-header"><div class="gantt-task-col" style="width:180px;min-width:180px">序号 / 任务名称</div>';
   days.forEach(d=>{
     const wd=new Date(d).getDay();
     const isWk=(wd===0||wd===6);
     const isToday=(d===todayStr);
-    html+='<div class="gantt-day-header'+(isWk?' weekend':'')+(isToday?' today':'')+'">'+d.slice(8)+'</div>';
+    html+='<div class="gantt-day-header'+(isWk?' weekend':'')+(isToday?' today':'')+'">'+d.slice(5).replace('-','/')+'</div>';
   });
   html+='</div>';
-  // 任务行（最多显示15条，优先重要任务和跨天任务）
   const sortedChains=chains.slice().sort((a,b)=>{
     if(a.isImportant!==b.isImportant)return a.isImportant?-1:1;
     if(a.isCrossDay!==b.isCrossDay)return a.isCrossDay?-1:1;
     return a.startDate.localeCompare(b.startDate);
   }).slice(0,15);
-  sortedChains.forEach(c=>{
+  sortedChains.forEach((c,idx)=>{
     const startIdx=Math.max(0,days.indexOf(c.startDate));
     const endIdx=Math.min(totalDays-1,Math.max(startIdx,days.indexOf(c.endDate)));
     const barStart=startIdx*dayWidth;
     const barWidth=Math.max(dayWidth,(endIdx-startIdx+1)*dayWidth);
-    let barClass='planned';
+    const stColor=statusColorMap[c.taskStatus]||statusColorMap.daily;
+    const stLabel=statusLabelMap[c.taskStatus]||'';
     let barText='';
-    if(c.isDone){barClass='done';barText='✓';}
-    else if(c.isOverdue){barClass='late';barText='超期';}
-    else if(c.isCrossDay){barClass='progress';barText=c.spanDays+'天';}
+    if(c.isDone){barText='✓';}
+    else if(c.isOverdue){barText='超期';}
+    else{barText=stLabel;}
     const star=c.isImportant?'<span class="gantt-star">★</span>':'';
+    const taskNo=String(idx+1).padStart(2,'0');
     html+='<div class="gantt-row">';
-    html+='<div class="gantt-task-name" title="'+esc(c.mainPlan)+'">'+star+esc((c.mainPlan||'').substring(0,12))+'</div>';
+    html+='<div class="gantt-task-name" style="width:180px;min-width:180px" title="'+esc(c.mainPlan)+'">';
+    html+='<span style="color:var(--text-light);font-weight:400">'+taskNo+'</span> ';
+    html+=star+esc((c.mainPlan||'').substring(0,16));
+    if(stLabel)html+=' <span style="background:'+stColor+';color:#fff;font-size:10px;padding:1px 5px;border-radius:3px">'+stLabel+'</span>';
+    html+='</div>';
     html+='<div class="gantt-cells">';
-    // 绘制单元格背景
     days.forEach(d=>{
       const wd=new Date(d).getDay();
       const isWk=(wd===0||wd===6);
       html+='<div class="gantt-cell'+(isWk?' weekend':'')+'"></div>';
     });
-    // 绘制任务条
-    html+='<div class="gantt-bar '+barClass+'" style="left:'+barStart+'%;width:'+barWidth+'%" title="'+esc(c.startDate)+'~'+esc(c.endDate)+' '+(c.isDone?'已完成':c.isOverdue?'超期':'进行中')+'">'+barText+'</div>';
+    html+='<div class="gantt-bar" style="left:'+barStart+'%;width:'+barWidth+'%;background:'+stColor+'" title="'+esc(c.startDate)+'~'+esc(c.endDate)+' '+(c.isDone?'已完成':c.isOverdue?'超期':'进行中')+'">'+barText+'</div>';
     html+='</div></div>';
   });
   html+='</div>';
-  // 图例
   html+='<div class="gantt-legend">';
-  html+='<div class="gantt-legend-item"><span class="gantt-legend-dot done"></span>已完成</div>';
-  html+='<div class="gantt-legend-item"><span class="gantt-legend-dot progress"></span>进行中</div>';
-  html+='<div class="gantt-legend-item"><span class="gantt-legend-dot late"></span>超期</div>';
-  html+='<div class="gantt-legend-item"><span class="gantt-legend-dot planned"></span>计划中</div>';
+  html+='<div class="gantt-legend-item"><span class="gantt-legend-dot" style="background:#6366f1"></span>当日任务</div>';
+  html+='<div class="gantt-legend-item"><span class="gantt-legend-dot" style="background:#3b82f6"></span>持续·开始</div>';
+  html+='<div class="gantt-legend-item"><span class="gantt-legend-dot" style="background:#f59e0b"></span>持续·中</div>';
+  html+='<div class="gantt-legend-item"><span class="gantt-legend-dot" style="background:#10b981"></span>持续·结束</div>';
+  html+='<div class="gantt-legend-item"><span class="gantt-legend-dot" style="background:#ef4444"></span>超期</div>';
   html+='</div></div>';
   return html;
 }
@@ -2485,51 +2521,83 @@ function downloadGantt(data,prefix,periodStart,periodEnd){
   const pf=DB.get('profile',{});
   const chains=buildTaskChains(data);
   if(chains.length===0){showToast('暂无任务数据，无法导出甘特图');return;}
-  // 生成日期序列
   const days=[];
   const start=new Date(periodStart),end=new Date(periodEnd);
   for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){
     days.push(d.toISOString().slice(0,10));
   }
-  // 构建HTML甘特图表格
+  const statusColorMap={'daily':'#6366f1','start':'#3b82f6','continue':'#f59e0b','end':'#10b981'};
+  const statusLabelMap={'daily':'当日任务','start':'持续·开始','continue':'持续·中','end':'持续·结束'};
   let html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(prefix)+'_甘特图</title>';
-  html+='<style>body{font-family:"Microsoft YaHei",sans-serif;padding:20px}h2{text-align:center;margin-bottom:5px}.info{text-align:center;color:#666;margin-bottom:15px;font-size:13px}';
-  html+='table{border-collapse:collapse;width:100%;font-size:11px}th,td{border:1px solid #ccc;padding:4px 6px;text-align:center;white-space:nowrap}';
-  html+='th{background:#4f46e5;color:#fff;position:sticky;top:0}th.weekend{background:#92400e}td.weekend{background:#fef3c7}';
-  html+='td.task-name{text-align:left;position:sticky;left:0;background:#fff;z-index:1;min-width:140px;max-width:220px;overflow:hidden;text-overflow:ellipsis}';
-  html+='td.bar-done{background:#10b981;color:#fff;font-weight:600}td.bar-progress{background:#3b82f6;color:#fff;font-weight:600}';
-  html+='td.bar-late{background:#ef4444;color:#fff;font-weight:600}td.bar-planned{background:#9ca3af;color:#fff;font-weight:600}';
-  html+='td.empty{background:#fafafa}.legend{margin-top:15px;font-size:12px;color:#666}.legend span{display:inline-block;margin-right:15px;padding:3px 8px;border-radius:3px;color:#fff;font-weight:600}';
-  html+='table.detail{margin-top:20px}table.detail th{background:#6b7280}table.detail td{text-align:left}';
+  html+='<style>';
+  html+='body{font-family:"Microsoft YaHei","微软雅黑",sans-serif;padding:25px 30px;background:#fff;color:#1f2937}';
+  html+='h2{text-align:center;margin-bottom:6px;font-size:20px;color:#1f2937;letter-spacing:3px}';
+  html+='.info{text-align:center;color:#6b7280;margin-bottom:18px;font-size:12px;border-bottom:1px solid #e5e7eb;padding-bottom:10px}';
+  html+='table{border-collapse:collapse;width:100%;font-size:11px}';
+  html+='th,td{border:1px solid #d1d5db;padding:5px 7px;text-align:center;white-space:nowrap}';
+  html+='th{background:#374151;color:#fff;font-weight:600;font-size:11px}';
+  html+='th.weekend{background:#92400e}';
+  html+='td.weekend{background:#fef3c7}';
+  html+='td.task-name{text-align:left;background:#fff;min-width:160px;max-width:250px;white-space:normal;word-break:break-all}';
+  html+='td.bar-done{background:#10b981;color:#fff;font-weight:600}';
+  html+='td.bar-progress{background:#f59e0b;color:#fff;font-weight:600}';
+  html+='td.bar-start{background:#3b82f6;color:#fff;font-weight:600}';
+  html+='td.bar-end{background:#10b981;color:#fff;font-weight:600}';
+  html+='td.bar-daily{background:#6366f1;color:#fff;font-weight:600}';
+  html+='td.bar-late{background:#ef4444;color:#fff;font-weight:600}';
+  html+='td.empty{background:#fafafa}';
+  html+='td.seq{background:#f9fafb;color:#6b7280;font-weight:600;text-align:center;min-width:28px}';
+  html+='td.type-cell{text-align:center;min-width:70px;font-weight:600}';
+  html+='.legend{margin-top:18px;font-size:11px;color:#6b7280;text-align:center}';
+  html+='.legend span{display:inline-block;margin:0 8px;padding:3px 10px;border-radius:3px;color:#fff;font-weight:600}';
+  html+='table.detail{margin-top:25px}';
+  html+='table.detail th{background:#374151;font-size:11px}';
+  html+='table.detail td{text-align:left;font-size:11px}';
+  html+='table.detail td.center{text-align:center}';
+  html+='table.detail tr:nth-child(even){background:#f9fafb}';
   html+='</style></head><body>';
-  html+='<h2>'+(pf.company?esc(pf.company)+' · ':'')+'任务甘特图</h2>';
-  html+='<div class="info">姓名：'+esc(pf.name||'-')+'　部门：'+esc(pf.dept||'-')+'　周期：'+periodStart+' 至 '+periodEnd+'　导出日期：'+todayStr()+'</div>';
+  html+='<h2>'+(pf.company?esc(pf.company)+' · ':'')+'工作任务甘特图</h2>';
+  html+='<div class="info">';
+  html+='姓名：'+esc(pf.name||'-')+'　';
+  html+='部门：'+esc(pf.dept||'-')+'　';
+  html+='岗位：'+esc(pf.position||'-')+'　';
+  html+='周期：'+periodStart+' 至 '+periodEnd+'　';
+  html+='导出日期：'+todayStr();
+  html+='</div>';
   // 甘特图表格
-  html+='<table><thead><tr><th>任务名称</th>';
+  html+='<table><thead><tr>';
+  html+='<th style="min-width:28px">序号</th>';
+  html+='<th style="min-width:70px">任务类型</th>';
+  html+='<th style="min-width:160px">任务名称</th>';
   days.forEach(d=>{
     const wd=new Date(d).getDay();
     const isWk=(wd===0||wd===6);
     html+='<th class="'+(isWk?'weekend':'')+'">'+d.slice(5).replace('-','/')+'</th>';
   });
   html+='</tr></thead><tbody>';
-  // 排序：重要任务优先，跨天任务优先，按开始日期
   const sortedChains=chains.slice().sort((a,b)=>{
     if(a.isImportant!==b.isImportant)return a.isImportant?-1:1;
     if(a.isCrossDay!==b.isCrossDay)return a.isCrossDay?-1:1;
     return a.startDate.localeCompare(b.startDate);
   });
-  sortedChains.forEach(c=>{
+  sortedChains.forEach((c,idx)=>{
     const startIdx=Math.max(0,days.indexOf(c.startDate));
     const endIdx=Math.min(days.length-1,Math.max(startIdx,days.indexOf(c.endDate)));
-    html+='<tr><td class="task-name">'+(c.isImportant?'★ ':'')+esc(c.mainPlan||'').substring(0,30)+'</td>';
-    days.forEach((d,idx)=>{
+    const stColor=statusColorMap[c.taskStatus]||statusColorMap.daily;
+    const stLabel=statusLabelMap[c.taskStatus]||'';
+    const stClass='bar-'+(c.taskStatus||'daily');
+    html+='<tr>';
+    html+='<td class="seq">'+String(idx+1).padStart(2,'0')+'</td>';
+    html+='<td class="type-cell" style="color:'+stColor+'">'+stLabel+'</td>';
+    html+='<td class="task-name">'+(c.isImportant?'★ ':'')+esc(c.mainPlan||'').substring(0,35)+'</td>';
+    days.forEach((d,di)=>{
       const wd=new Date(d).getDay();
       const isWk=(wd===0||wd===6);
-      if(idx>=startIdx&&idx<=endIdx){
-        let barClass='bar-planned',barText='';
+      if(di>=startIdx&&di<=endIdx){
+        let barClass=stClass,barText='';
         if(c.isDone){barClass='bar-done';barText='✓';}
         else if(c.isOverdue){barClass='bar-late';barText='超期';}
-        else if(c.isCrossDay){barClass='bar-progress';barText=c.spanDays+'天';}
+        else{barText=(di===startIdx)?'':' ';}
         html+='<td class="'+barClass+'">'+barText+'</td>';
       }else{
         html+='<td class="'+(isWk?'weekend':'empty')+'"></td>';
@@ -2539,23 +2607,35 @@ function downloadGantt(data,prefix,periodStart,periodEnd){
   });
   html+='</tbody></table>';
   // 图例
-  html+='<div class="legend"><span class="bar-done">已完成</span><span class="bar-progress">进行中</span><span class="bar-late">超期</span><span class="bar-planned">计划中</span></div>';
+  html+='<div class="legend">';
+  html+='<span style="background:#6366f1">当日任务</span>';
+  html+='<span style="background:#3b82f6">持续·开始</span>';
+  html+='<span style="background:#f59e0b">持续·中</span>';
+  html+='<span style="background:#10b981">持续·结束</span>';
+  html+='<span style="background:#ef4444">超期</span>';
+  html+='<span style="background:#9ca3af">已完成</span>';
+  html+='</div>';
   // 任务详情表
-  html+='<table class="detail"><thead><tr><th>序号</th><th>任务名称</th><th>开始日期</th><th>结束日期</th><th>实际天数</th><th>计划天数</th><th>状态</th><th>重要</th><th>跨天</th><th>超期</th><th>延续原因</th></tr></thead><tbody>';
+  html+='<table class="detail"><thead><tr>';
+  html+='<th>序号</th><th>任务名称</th><th>任务类型</th><th>开始日期</th><th>结束日期</th><th>实际天数</th><th>计划天数</th><th>状态</th><th>重要</th><th>跨天</th><th>超期</th><th>延续原因</th>';
+  html+='</tr></thead><tbody>';
   sortedChains.forEach((c,i)=>{
     const status=c.isDone?'已完成':(c.isOverdue?'超期':'进行中');
+    const stLabel=statusLabelMap[c.taskStatus]||'';
+    const stColor=statusColorMap[c.taskStatus]||'#6366f1';
     html+='<tr>';
-    html+='<td>'+(i+1)+'</td>';
-    html+='<td>'+esc(c.mainPlan||'').substring(0,40)+'</td>';
+    html+='<td class="center">'+(i+1)+'</td>';
+    html+='<td>'+esc(c.mainPlan||'').substring(0,45)+'</td>';
+    html+='<td class="center" style="color:'+stColor+';font-weight:600">'+stLabel+'</td>';
     html+='<td>'+c.startDate+'</td>';
     html+='<td>'+c.endDate+'</td>';
-    html+='<td>'+c.spanDays+'</td>';
-    html+='<td>'+c.planDays+'</td>';
-    html+='<td>'+status+'</td>';
-    html+='<td>'+(c.isImportant?'★':'')+'</td>';
-    html+='<td>'+(c.isCrossDay?'是':'否')+'</td>';
-    html+='<td>'+(c.isOverdue?'是':'否')+'</td>';
-    html+='<td>'+(c.isCrossDay?(c.hasReason?'已注明':'⚠未注明'):'-')+'</td>';
+    html+='<td class="center">'+c.spanDays+'</td>';
+    html+='<td class="center">'+c.planDays+'</td>';
+    html+='<td class="center">'+status+'</td>';
+    html+='<td class="center">'+(c.isImportant?'★':'')+'</td>';
+    html+='<td class="center">'+(c.isCrossDay?'是':'否')+'</td>';
+    html+='<td class="center">'+(c.isOverdue?'是':'否')+'</td>';
+    html+='<td>'+(c.isCrossDay?(c.hasReason?'已注明':'⚠ 未注明'):'-')+'</td>';
     html+='</tr>';
   });
   html+='</tbody></table>';
