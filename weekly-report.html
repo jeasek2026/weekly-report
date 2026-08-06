@@ -1312,10 +1312,11 @@ function renderRecords(){
 /* 获取近期任务列表（供用户手动选择关联） */
 function getRecentUndoneTasks(days,beforeDate){
   const result=[];
-  const keys=Object.keys(localStorage).filter(k=>k.startsWith(DB.prefix+'daily_'));
+  const DB_PREFIX='wr_'; // 与 DB.get/DB.set 中的 'wr_' 前缀保持一致
+  const keys=Object.keys(localStorage).filter(k=>k.startsWith(DB_PREFIX+'daily_'));
   keys.sort().reverse();
   for(const key of keys){
-    const dateStr=key.replace(DB.prefix+'daily_','');
+    const dateStr=key.replace(DB_PREFIX+'daily_','');
     if(dateStr>=beforeDate)continue; // 仅取当日之前的
     const diff=Math.round((new Date(beforeDate)-new Date(dateStr))/86400000);
     if(diff>days)break;
