@@ -166,6 +166,10 @@
   .record-item .ri-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px}
   .record-item .ri-head-left{display:flex;align-items:center;gap:8px;min-width:0}
   .record-item .ri-num{font-size:12px;color:var(--text-light);font-weight:600}
+  .ri-tasktype{
+    display:inline-block;font-size:11px;font-weight:600;
+    padding:2px 8px;border-radius:10px;letter-spacing:.3px;
+  }
   .ri-important-toggle{
     display:inline-flex;align-items:center;gap:4px;cursor:pointer;
     font-size:12px;color:var(--text-light);user-select:none;
@@ -1146,7 +1150,7 @@ function loadDaily(){
   const data=DB.get('daily_'+state.curDate,null);
   const weekend=isWeekend(state.curDate);
   if(data){
-    state.curRecords=(data.records||[]).map(r=>Object.assign({isImportant:false,planDays:1,taskId:'',linkedTaskId:''},r));
+    state.curRecords=(data.records||[]).map(r=>ensureTaskStatus(Object.assign({isImportant:false,planDays:1,taskId:'',linkedTaskId:''},r)));
     state.curField=!!data.field;
     state.fieldPlace=data.fieldPlace||'';
     state.fieldNote=data.fieldNote||'';
@@ -1161,7 +1165,7 @@ function loadDaily(){
       state.restDayOverridden=false;
     }
   }else{
-    state.curRecords=[{plan:'',progress:'',result:'',isImportant:false,planDays:1,taskId:'',linkedTaskId:''}];
+    state.curRecords=[ensureTaskStatus({plan:'',progress:'',result:'',isImportant:false,planDays:1,taskId:'',linkedTaskId:''})];
     state.curField=false;state.fieldPlace='';state.fieldNote='';
     // 新日期：周六日默认为休息日
     state.isRestDay=weekend;
@@ -1172,6 +1176,17 @@ function loadDaily(){
   renderRestDayBanner();
   renderFieldSwitch();
   renderRecords();
+}
+/* 兼容旧数据：推断 taskStatus 字段（daily/start/continue/end） */
+function ensureTaskStatus(r){
+  if(r.taskStatus) return r; // 已有字段，跳过
+  const isDone=!!(r.progress&&(r.progress.includes('100')||/已完成/.test(r.progress)));
+  if(r.linkedTaskId){
+    r.taskStatus = isDone ? 'end' : 'continue';
+  }else{
+    r.taskStatus = (r.planDays&&r.planDays>1) ? 'start' : 'daily';
+  }
+  return r;
 }
 function renderRestDayBanner(){
   const banner=document.getElementById('restDayBanner');
@@ -1212,34 +1227,58 @@ function toggleField(){ state.curField=!state.curField; renderFieldSwitch(); }
 function renderRecords(){
   const list=document.getElementById('recordList');
   list.innerHTML='';
-  if(state.curRecords.length===0)state.curRecords.push({plan:'',progress:'',result:'',isImportant:false,planDays:1,taskId:'',linkedTaskId:''});
-  // 获取近期未完成任务列表（最近14天，排除当日）
+  if(state.curRecords.length===0)state.curRecords.push(ensureTaskStatus({plan:'',progress:'',result:'',isImportant:false,planDays:1,taskId:'',linkedTaskId:''}));
   const undoneTasks=getRecentUndoneTasks(14,state.curDate);
   state.curRecords.forEach((r,i)=>{
     if(!r.taskId)r.taskId='T'+Date.now()+'_'+i+'_'+Math.random().toString(36).substr(2,6);
+    ensureTaskStatus(r); // 确保 taskStatus 字段存在
     const div=document.createElement('div');
     div.className='record-item'+(r.isImportant?' is-important':'');
     const important=r.isImportant;
     const planDays=r.planDays||1;
-    // 关联任务信息
+    const status=r.taskStatus||'daily';
+    // 状态对应文案与配色
+    const statusMap={
+      'daily':   {label:'当日任务',          style:'background:#e0e7ff;color:#3730a3'},
+      'start':   {label:'持续任务[开始]',    style:'background:#dbeafe;color:#1e40af'},
+      'continue':{label:'持续任务[...]',     style:'background:#fef3c7;color:#92400e'},
+      'end':     {label:'持续任务[结束]',    style:'background:#d1fae5;color:#065f46'}
+    };
+    const st=statusMap[status]||statusMap.daily;
+    // 关联任务详细信息（仅 continue/end 状态显示）
     let linkInfoHTML='';
-    if(r.linkedTaskId){
+    if(status==='continue'||status==='end'){
       const linked=undoneTasks.find(t=>t.taskId===r.linkedTaskId);
-      if(linked){
+      if(r.linkedTaskId&&linked){
         const span=Math.round((new Date(state.curDate)-new Date(linked.date))/86400000);
-        linkInfoHTML=`<div class="ri-link-info"><span class="chain-tag">🔗 关联任务</span> ${esc(linked.date)} 起的「${esc((linked.plan||'').substring(0,30))}」${span>0?'（已延续 '+span+' 天）':''}</div>`;
+        linkInfoHTML=`<div class="ri-link-info"><span class="chain-tag">🔗 ${st.label}</span> 续做自 ${esc(linked.date)} 起的「${esc((linked.plan||'').substring(0,30))}」${span>0?'（已延续 '+span+' 天）':''}</div>`;
+      }else if(r.linkedTaskId){
+        linkInfoHTML=`<div class="ri-link-info" style="color:#b91c1c;background:#fee2e2;border-color:#fecaca"><span class="chain-tag">⚠</span> 前序任务未找到，请重新选择关联</div>`;
+      }else{
+        linkInfoHTML=`<div class="ri-link-info" style="color:#b45309;background:#fffbeb;border-color:#fde68a"><span class="chain-tag">!</span> 当前为「${st.label}」状态，请在下方选择前序持续任务</div>`;
       }
     }
-    // 关联选择器
-    let linkSelHTML='<option value="">无关联（独立任务）</option>';
-    undoneTasks.forEach(t=>{
-      const span=Math.round((new Date(state.curDate)-new Date(t.date))/86400000);
-      linkSelHTML+=`<option value="${t.taskId}" ${r.linkedTaskId===t.taskId?'selected':''}>${t.date}（${span}天前）${(t.plan||'').substring(0,20)}</option>`;
-    });
+    // 关联任务下拉框选项（仅 continue/end 状态显示）
+    const showLinkSel=(status==='continue'||status==='end');
+    let linkSelHTML='';
+    if(showLinkSel){
+      linkSelHTML='<option value="">— 请选择前序任务 —</option>';
+      if(undoneTasks.length===0){
+        linkSelHTML+='<option value="" disabled>（暂无可关联的前序持续任务）</option>';
+      }else{
+        undoneTasks.forEach(t=>{
+          const span=Math.round((new Date(state.curDate)-new Date(t.date))/86400000);
+          const impTag=t.isImportant?'★':'';
+          const doneTag=t.isDone?'✓':'';
+          linkSelHTML+=`<option value="${t.taskId}" ${r.linkedTaskId===t.taskId?'selected':''}>${doneTag}${t.date}（${span}天前）${impTag}${(t.plan||'').substring(0,20)}</option>`;
+        });
+      }
+    }
     div.innerHTML=`
       <div class="ri-head">
         <div class="ri-head-left">
           <span class="ri-num">工作记录 ${i+1}</span>
+          <span class="ri-tasktype" style="${st.style}">${st.label}</span>
           <span class="ri-important-toggle ${important?'on':''}" onclick="toggleImportant(${i})">
             <span class="star">${important?'★':'☆'}</span>${important?'重要任务':'标记为重要'}
           </span>
@@ -1250,8 +1289,15 @@ function renderRecords(){
       <div class="ri-meta-row">
         <div class="field field-mini ri-plan-days"><label>计划天数</label>
           <input type="number" min="1" max="30" value="${planDays}" onchange="updRecord(${i},'planDays',parseInt(this.value)||1)"></div>
-        <div class="field field-mini ri-link-sel"><label>关联前序任务（跨天延续）</label>
-          <select onchange="updRecord(${i},'linkedTaskId',this.value)">${linkSelHTML}</select></div>
+        <div class="field field-mini ri-status-sel"><label>任务状态（手动选择）</label>
+          <select onchange="changeTaskStatus(${i},this.value)">
+            <option value="daily"    ${status==='daily'?'selected':''}>当日任务</option>
+            <option value="start"    ${status==='start'?'selected':''}>持续任务[开始]</option>
+            <option value="continue" ${status==='continue'?'selected':''}>持续任务[...]</option>
+            <option value="end"      ${status==='end'?'selected':''}>持续任务[结束]</option>
+          </select></div>
+        ${showLinkSel?`<div class="field field-mini ri-link-sel"><label>关联前序持续任务</label>
+          <select onchange="updRecord(${i},'linkedTaskId',this.value)">${linkSelHTML}</select></div>`:''}
       </div>
       <div class="field field-mini"><label>工作计划/内容</label>
         <input type="text" value="${esc(r.plan)}" placeholder="今日要做的工作" oninput="updRecord(${i},'plan',this.value)"></div>
@@ -1263,7 +1309,7 @@ function renderRecords(){
     list.appendChild(div);
   });
 }
-/* 获取近期未完成任务（进度未达100%） */
+/* 获取近期任务列表（供用户手动选择关联） */
 function getRecentUndoneTasks(days,beforeDate){
   const result=[];
   const keys=Object.keys(localStorage).filter(k=>k.startsWith(DB.prefix+'daily_'));
@@ -1275,15 +1321,21 @@ function getRecentUndoneTasks(days,beforeDate){
     if(diff>days)break;
     const data=DB.get('daily_'+dateStr,null);
     if(!data||data.isRestDay)continue;
-    (data.records||[]).forEach(r=>{
+    (data.records||[]).forEach((r,idx)=>{
       if(!r.plan)return;
-      const done=r.progress&&(r.progress.includes('100')||/已完成/.test(r.progress));
-      if(!done){
-        result.push({date:dateStr,plan:r.plan,progress:r.progress,taskId:r.taskId||'',isImportant:!!r.isImportant});
-      }
+      // 确保有 taskId（旧数据可能没有）
+      const tid=r.taskId||('T_'+dateStr+'_'+idx);
+      const done=!!(r.progress&&(r.progress.includes('100')||/已完成/.test(r.progress)));
+      result.push({
+        date:dateStr,plan:r.plan,progress:r.progress,
+        taskId:tid,isImportant:!!r.isImportant,isDone:done,
+        taskStatus:r.taskStatus||''
+      });
     });
   }
-  return result.slice(0,20); // 最多20条
+  // 未完成的排前面，最多30条
+  result.sort((a,b)=>(a.isDone?1:0)-(b.isDone?1:0)||b.date.localeCompare(a.date));
+  return result.slice(0,30);
 }
 function toggleImportant(i){
   if(state.curRecords[i]){
@@ -1297,8 +1349,18 @@ function formatReportHTML(text){
   return esc(text).replace(/§RED§/g,'<span style="color:red;font-weight:600">').replace(/§END§/g,'</span>');
 }
 function updRecord(i,k,v){ if(state.curRecords[i])state.curRecords[i][k]=v; }
-function addRecord(){ state.curRecords.push({plan:'',progress:'',result:'',isImportant:false,planDays:1,taskId:'',linkedTaskId:''}); renderRecords(); }
+function addRecord(){ state.curRecords.push(ensureTaskStatus({plan:'',progress:'',result:'',isImportant:false,planDays:1,taskId:'',linkedTaskId:''})); renderRecords(); }
 function delRecord(i){ state.curRecords.splice(i,1); renderRecords(); }
+/* 手动切换任务状态：daily/start 清空关联；continue/end 保留关联由用户选 */
+function changeTaskStatus(i,newStatus){
+  const r=state.curRecords[i];
+  if(!r)return;
+  r.taskStatus=newStatus;
+  if(newStatus==='daily'||newStatus==='start'){
+    r.linkedTaskId=''; // 切回独立任务，清空关联
+  }
+  renderRecords();
+}
 
 function saveDaily(){
   // 过滤空记录
@@ -1493,9 +1555,11 @@ function buildWeeklyHTML(start,end,data){
       text+=`    休息日，无工作记录。\n`;
     }else{
       recs.forEach((x,i)=>{
-        const linkTag=x.linkedTaskId?'[续] ':'';
+        // 按用户手选的 taskStatus 显示对应状态标签
+        const stMap={'daily':'','start':'[持续·开始] ','continue':'[持续·中] ','end':'[持续·结束] '};
+        const statusTag=stMap[x.taskStatus]||'';
         const planTag=x.planDays&&x.planDays>1?'(计划'+x.planDays+'天) ':'';
-        const line=`    ${i+1}.${x.isImportant?'[重要] ':''}${linkTag}${planTag}${x.plan||'(未填写)'}`;
+        const line=`    ${i+1}.${x.isImportant?'[重要] ':''}${statusTag}${planTag}${x.plan||'(未填写)'}`;
         text+=(x.isImportant?'§RED§'+line+'§END§':line)+'\n';
         if(x.progress)text+=`       进度：${x.progress}\n`;
         if(x.result)text+=`       成果：${x.result}\n`;
