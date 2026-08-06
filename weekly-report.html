@@ -287,9 +287,10 @@
   .bar-row .bar-val{width:32px;text-align:right;font-weight:600;flex-shrink:0}
 
   .report-text{
-    background:#fafbfc;border:1px solid var(--border);border-radius:var(--radius-sm);
-    padding:12px;font-size:13px;line-height:1.7;white-space:pre-wrap;
-    max-height:320px;overflow-y:auto;
+    background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);
+    padding:18px 22px;font-size:13px;line-height:1.85;white-space:pre-wrap;
+    max-height:520px;overflow-y:auto;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#222;
   }
   .summary-card{background:linear-gradient(135deg,#ecfdf5,#d1fae5);border:1px solid #6ee7b7}
   .summary-card .card-title{color:#065f46}
@@ -444,6 +445,10 @@
     <div class="card">
       <div class="card-title"><span class="emoji">👤</span>岗位信息</div>
       <p style="font-size:13px;color:var(--text-light);margin-bottom:12px">填写一次即可，岗位变动时可随时修改。</p>
+      <div class="field">
+        <label>公司名称</label>
+        <input type="text" id="pfCompany" placeholder="您的公司名称">
+      </div>
       <div class="field">
         <label>姓名</label>
         <input type="text" id="pfName" placeholder="您的姓名">
@@ -781,6 +786,8 @@ let state = {
   isRestDay: false, // 当日是否为休息日（周六日默认true，可手动覆盖）
   restDayOverridden: false // 是否手动覆盖过休息日状态
 };
+let lastWeeklyRawText='';  // 周报原始文本（含红色标记，供导出使用）
+let lastMonthlyRawText=''; // 月报原始文本（含红色标记，供导出使用）
 
 function todayStr(){ const d=new Date(); return fmtDate(d); }
 function fmtDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -1108,6 +1115,7 @@ function switchView(v){
 
 /* ===================== 岗位信息 ===================== */
 function fillProfileForm(pf){
+  document.getElementById('pfCompany').value=pf.company||'';
   document.getElementById('pfName').value=pf.name||'';
   document.getElementById('pfDept').value=pf.dept||'';
   document.getElementById('pfPosition').value=pf.position||'';
@@ -1117,7 +1125,7 @@ function fillProfileForm(pf){
 }
 function saveProfile(){
   const pf={
-    name:val('pfName'),dept:val('pfDept'),position:val('pfPosition'),
+    company:val('pfCompany'),name:val('pfName'),dept:val('pfDept'),position:val('pfPosition'),
     empNo:val('pfEmpNo'),phone:val('pfPhone'),note:val('pfNote')
   };
   if(!pf.name){showToast('请填写姓名');return;}
@@ -1284,6 +1292,10 @@ function toggleImportant(i){
   }
 }
 function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+/* 格式化报告文本：先转义再替换红色标记为HTML span */
+function formatReportHTML(text){
+  return esc(text).replace(/§RED§/g,'<span style="color:red;font-weight:600">').replace(/§END§/g,'</span>');
+}
 function updRecord(i,k,v){ if(state.curRecords[i])state.curRecords[i][k]=v; }
 function addRecord(){ state.curRecords.push({plan:'',progress:'',result:'',isImportant:false,planDays:1,taskId:'',linkedTaskId:''}); renderRecords(); }
 function delRecord(i){ state.curRecords.splice(i,1); renderRecords(); }
@@ -1459,57 +1471,60 @@ function buildWeeklyHTML(start,end,data){
   </div>`;
 
   // 周报正文
-  let text=`工 作 周 报\n${'='.repeat(30)}\n`;
-  text+=`姓名：${pf.name||'-'}    部门：${pf.dept||'-'}    岗位：${pf.position||'-'}\n`;
-  text+=`周期：${start} 至 ${end}\n\n`;
+  const companyPrefix=pf.company?pf.company+' · ':'';
+  let text=`${companyPrefix}工作周报\n\n`;
+  text+=`姓　名：${pf.name||'-'}　　部　门：${pf.dept||'-'}　　岗　位：${pf.position||'-'}\n`;
+  text+=`周　期：${start} 至 ${end}\n`;
+  text+=`${'─'.repeat(36)}\n\n`;
   text+=`一、本周工作概况\n`;
-  text+=`本周共记录 ${totalDays} 天（其中工作日 ${workDays} 天，休息日 ${restDays} 天），完成工作事项 ${totalRecords} 项（含重要任务 ${importantRecords} 项）。\n`;
-  text+=`按任务链统计：本周共有 ${chains.length} 项任务，其中 ${chainDoneCount} 项已在本周内完成，${chainUndoneCount} 项进行中/未完成，任务完成率 ${chainCompleteRate}%。\n`;
+  text+=`  本周共记录 ${totalDays} 天（其中工作日 ${workDays} 天，休息日 ${restDays} 天），完成工作事项 ${totalRecords} 项（含重要任务 ${importantRecords} 项）。\n`;
+  text+=`  按任务链统计：本周共有 ${chains.length} 项任务，其中 ${chainDoneCount} 项已在本周内完成，${chainUndoneCount} 项进行中/未完成，任务完成率 ${chainCompleteRate}%。\n`;
   if(crossDayTasks.length>0){
-    text+=`其中 ${crossDayTasks.length} 项为跨天延续任务（详见第三节分析）。\n`;
+    text+=`  其中 ${crossDayTasks.length} 项为跨天延续任务。\n`;
   }
-  text+=`外勤 ${fieldDays} 天。\n\n`;
+  text+=`  外勤 ${fieldDays} 天。\n\n`;
 
   text+=`二、每日工作明细\n`;
   data.forEach(r=>{
     const isRest=r.isRestDay===true;
-    text+=`\n【${r.date} ${weekdayCN(r.date)}】${r.field?'（外勤：'+(r.fieldPlace||'')+'）':''}${isRest?'（休息日）':''}\n`;
+    text+=`\n  【${r.date} ${weekdayCN(r.date)}】${r.field?'（外勤：'+(r.fieldPlace||'')+'）':''}${isRest?'（休息日）':''}\n`;
     const recs=(r.records||[]).filter(x=>x.plan||x.progress||x.result);
     if(recs.length===0&&isRest){
-      text+=`  休息日，无工作记录。\n`;
+      text+=`    休息日，无工作记录。\n`;
     }else{
       recs.forEach((x,i)=>{
         const linkTag=x.linkedTaskId?'[续] ':'';
         const planTag=x.planDays&&x.planDays>1?'(计划'+x.planDays+'天) ':'';
-        text+=`  ${i+1}.${x.isImportant?'★[重要] ':''}${linkTag}${planTag}${x.plan||'(未填写)'}\n`;
-        if(x.progress)text+=`     进度：${x.progress}\n`;
-        if(x.result)text+=`     成果：${x.result}\n`;
+        const line=`    ${i+1}.${x.isImportant?'[重要] ':''}${linkTag}${planTag}${x.plan||'(未填写)'}`;
+        text+=(x.isImportant?'§RED§'+line+'§END§':line)+'\n';
+        if(x.progress)text+=`       进度：${x.progress}\n`;
+        if(x.result)text+=`       成果：${x.result}\n`;
       });
     }
-    if(r.field&&r.fieldNote)text+=`  外勤说明：${r.fieldNote}\n`;
+    if(r.field&&r.fieldNote)text+=`    外勤说明：${r.fieldNote}\n`;
   });
 
-  text+=`\n三、跨天延续任务分析\n`;
-  text+=buildCrossDayAnalysisText(crossDayTasks)+'\n';
-
-  text+=`\n四、本周汇总分析\n`;
-  text+=`1. 工作量分布：${data.length?`日均 ${(totalRecords/totalDays).toFixed(1)} 项`:'无数据'}${fieldDays?`，外勤占比 ${Math.round(fieldDays/totalDays*100)}%`:''}。\n`;
-  text+=`2. 完成情况（按任务链）：${chainDoneCount} 项已在本周完成，${chainUndoneCount} 项进行中/未完成。未完成任务将延续至下周。\n`;
+  text+=`\n三、本周汇总分析\n`;
+  text+=`  1. 工作量分布：${data.length?`日均 ${(totalRecords/totalDays).toFixed(1)} 项`:'无数据'}${fieldDays?`，外勤占比 ${Math.round(fieldDays/totalDays*100)}%`:''}。\n`;
+  text+=`  2. 完成情况（按任务链）：${chainDoneCount} 项已在本周完成，${chainUndoneCount} 项进行中/未完成。未完成任务将延续至下周。\n`;
   if(crossDayTasks.length>0){
     const overdue=crossDayTasks.filter(c=>c.isOverdue);
     const noReason=crossDayTasks.filter(c=>!c.hasReason);
-    text+=`3. 跨天任务：本周共 ${crossDayTasks.length} 项跨天任务`;
+    text+=`  3. 跨天任务：本周共 ${crossDayTasks.length} 项跨天任务`;
     if(overdue.length>0)text+=`，其中 ${overdue.length} 项超期`;
     if(noReason.length>0)text+=`，${noReason.length} 项未注明延续原因`;
     text+=`。\n`;
+    if(importantRecords>0)text+=`  4. 重点任务：本周共标记 ${importantRecords} 项重要任务，请重点关注其推进进度。\n`;
+  }else if(importantRecords>0){
+    text+=`  3. 重点任务：本周共标记 ${importantRecords} 项重要任务，请重点关注其推进进度。\n`;
   }
-  if(importantRecords>0)text+=`${crossDayTasks.length>0?'4':'3'}. 重点任务：本周共标记 ${importantRecords} 项重要任务，请重点关注其推进进度。\n`;
-  text+=`\n五、下周计划\n${savedPlan||'（请补充下周重点工作安排）'}\n`;
+  text+=`\n四、下周计划\n  ${(savedPlan||'（请补充下周重点工作安排）').replace(/\n/g,'\n  ')}\n`;
 
+  lastWeeklyRawText=text;
   html+=`
   <div class="card">
     <div class="card-title"><span class="emoji">📄</span>周报正文</div>
-    <div class="report-text" id="weeklyText">${esc(text)}</div>
+    <div class="report-text" id="weeklyText">${formatReportHTML(text)}</div>
   </div>`;
 
   // 甘特图卡片
@@ -1517,24 +1532,6 @@ function buildWeeklyHTML(start,end,data){
     html+=`<div class="card">
     <div class="card-title"><span class="emoji">📅</span>任务甘特图</div>
     ${buildGanttHTML(chains,start,end)}
-  </div>`;
-  }
-
-  // 跨天延续分析卡片
-  if(crossDayTasks.length>0){
-    html+=`<div class="card" style="border-left:4px solid #f59e0b">
-    <div class="card-title" style="color:#b45309"><span class="emoji">⏳</span>跨天延续任务分析（${crossDayTasks.length} 项）</div>
-    <div style="font-size:13px;line-height:1.7">
-    ${crossDayTasks.map(c=>{
-      const statusColor=c.isDone?'#10b981':(c.isOverdue?'#ef4444':'#3b82f6');
-      const statusText=c.isDone?'已完成':(c.isOverdue?'超期':'进行中');
-      return `<div style="margin-bottom:8px;padding:8px;background:#fffbeb;border-radius:8px">
-        <div style="font-weight:600;color:#92400e">${c.isImportant?'★ ':''}${esc((c.mainPlan||'').substring(0,30))}</div>
-        <div style="font-size:12px;color:#666;margin-top:3px">${c.startDate} ~ ${c.endDate}（${c.spanDays}天，计划${c.planDays}天）<span style="color:${statusColor};font-weight:600"> ${statusText}</span></div>
-        ${!c.hasReason?'<div style="font-size:11px;color:#ef4444;margin-top:3px">⚠ 延续原因未注明</div>':'<div style="font-size:11px;color:#10b981;margin-top:3px">✓ 延续原因已记录</div>'}
-      </div>`;
-    }).join('')}
-    </div>
   </div>`;
   }
 
@@ -2031,185 +2028,191 @@ function buildMonthlyHTML(ym,data){
   </div>`;
 
   // ========== 月报正文（重点任务突出 + 普通任务简化 + 关联分析 + 方向指导） ==========
-  let text=`月 度 工 作 总 结 报 告\n${'='.repeat(38)}\n`;
-  text+=`姓名：${pf.name||'-'}    部门：${pf.dept||'-'}    岗位：${pf.position||'-'}\n`;
-  text+=`报告月份：${ym}    报告日期：${todayStr()}\n\n`;
+  const companyPrefixM=pf.company?pf.company+' · ':'';
+  let text=`${companyPrefixM}月度工作总结报告\n\n`;
+  text+=`姓　名：${pf.name||'-'}　　部　门：${pf.dept||'-'}　　岗　位：${pf.position||'-'}\n`;
+  text+=`报告月份：${ym}　　报告日期：${todayStr()}\n`;
+  text+=`${'─'.repeat(38)}\n\n`;
 
   // 一、月度工作概况
-  text+=`一、月度工作概况\n${'-'.repeat(38)}\n`;
-  text+=`本月共出勤记录 ${totalDays} 天（其中工作日 ${workDays} 天，休息日 ${restDays} 天），累计完成工作事项 ${totalRecords} 项（含重要任务 ${importantCount} 项）。\n`;
-  text+=`按任务链统计：本月共有 ${chains.length} 项任务，其中 ${chainDoneCount} 项已在月内完成，${chainUndoneCount} 项进行中/未完成，任务完成率 ${chainCompleteRate}%。\n`;
+  text+=`一、月度工作概况\n`;
+  text+=`  本月共出勤记录 ${totalDays} 天（其中工作日 ${workDays} 天，休息日 ${restDays} 天），累计完成工作事项 ${totalRecords} 项（含重要任务 ${importantCount} 项）。\n`;
+  text+=`  按任务链统计：本月共有 ${chains.length} 项任务，其中 ${chainDoneCount} 项已在月内完成，${chainUndoneCount} 项进行中/未完成，任务完成率 ${chainCompleteRate}%。\n`;
   if(crossDayTasks.length>0){
     const overdue=crossDayTasks.filter(c=>c.isOverdue);
     const noReason=crossDayTasks.filter(c=>!c.hasReason);
-    text+=`其中 ${crossDayTasks.length} 项为跨天延续任务`;
+    text+=`  其中 ${crossDayTasks.length} 项为跨天延续任务`;
     if(overdue.length>0)text+=`（${overdue.length} 项超期）`;
     if(noReason.length>0)text+=`（${noReason.length} 项未注明延续原因）`;
-    text+=`，详见第六节分析。\n`;
+    text+=`。\n`;
   }
-  text+=`本月外勤工作 ${fieldDays} 天${fieldDays?`，占全月工作日 ${Math.round(fieldDays/totalDays*100)}%`:'无外勤记录'}。\n\n`;
+  text+=`  本月外勤工作 ${fieldDays} 天${fieldDays?`，占全月工作日 ${Math.round(fieldDays/totalDays*100)}%`:'无外勤记录'}。\n\n`;
 
   // 二、重点任务专题（重要任务详列）
-  text+=`二、重点任务专题（重要任务）\n${'-'.repeat(38)}\n`;
+  text+=`二、重点任务专题（重要任务）\n`;
   if(importantRecords.length===0){
-    text+='本月未标记重要任务。建议在日常记录时将关键工作标记为"重要任务"，以便月报重点突出。\n\n';
+    text+='  本月未标记重要任务。建议在日常记录时将关键工作标记为"重要任务"，以便月报重点突出。\n\n';
   }else{
-    text+=`本月共标记重要任务 ${importantRecords.length} 项，按时间顺序梳理如下：\n\n`;
+    text+=`  本月共标记重要任务 ${importantRecords.length} 项，按时间顺序梳理如下：\n\n`;
     importantRecords.forEach((it,idx)=>{
       const done=it.progress&&(it.progress.includes('完成')||it.progress.includes('100'));
-      text+=`${idx+1}.【${it.date} ${weekdayCN(it.date)} · 第${it.week}周${it.field?' · 外勤':''}】${done?'✓ ':''}${it.plan||'（无计划内容）'}\n`;
-      if(it.progress)text+=`   进度：${it.progress}\n`;
-      if(it.result)text+=`   成果：${it.result}\n`;
+      const line=`  ${idx+1}.【${it.date} ${weekdayCN(it.date)} · 第${it.week}周${it.field?' · 外勤':''}】${done?'✓ ':''}${it.plan||'（无计划内容）'}`;
+      text+='§RED§'+line+'§END§\n';
+      if(it.progress)text+=`     进度：${it.progress}\n`;
+      if(it.result)text+=`     成果：${it.result}\n`;
       text+='\n';
     });
   }
 
   // 三、普通工作概览（按周简化展示，不逐条罗列）
-  text+=`三、普通工作概览（按周汇总）\n${'-'.repeat(38)}\n`;
+  text+=`三、普通工作概览（按周汇总）\n`;
   if(totalRecords-importantCount===0&&importantCount===0){
-    text+='本月暂无工作记录。\n\n';
+    text+='  本月暂无工作记录。\n\n';
   }else{
     Object.keys(weekStats).sort((a,b)=>a-b).forEach(wk=>{
       const ws=weekStats[wk];
       const normalCnt=ws.records-ws.important;
       const wkItems=allRecords.filter(x=>String(x.week)===String(wk)&&!x.isImportant);
-      text+=`第 ${wk} 周（共 ${ws.days} 天，工作 ${ws.records} 项，其中重要 ${ws.important} 项，普通 ${normalCnt} 项）：\n`;
+      text+=`  第 ${wk} 周（共 ${ws.days} 天，工作 ${ws.records} 项，其中重要 ${ws.important} 项，普通 ${normalCnt} 项）：\n`;
       // 普通任务只显示前3项作为示例
       wkItems.slice(0,3).forEach(it=>{
-        text+=`  · ${it.date.slice(5)}：${(it.plan||'').substring(0,40)}${(it.plan||'').length>40?'...':''}\n`;
+        text+=`    · ${it.date.slice(5)}：${(it.plan||'').substring(0,40)}${(it.plan||'').length>40?'...':''}\n`;
       });
-      if(wkItems.length>3)text+=`  · 等共 ${wkItems.length} 项普通工作（详见每日记录）\n`;
-      if(wkItems.length===0&&ws.important>0)text+=`  · 本周工作均为重要任务，详见上节。\n`;
+      if(wkItems.length>3)text+=`    · 等共 ${wkItems.length} 项普通工作（详见每日记录）\n`;
+      if(wkItems.length===0&&ws.important>0)text+=`    · 本周工作均为重要任务，详见上节。\n`;
       text+='\n';
     });
   }
 
   // 四、工作分类汇总分析
-  text+=`四、工作分类汇总分析\n${'-'.repeat(38)}\n`;
+  text+=`四、工作分类汇总分析\n`;
   if(catNames.length===0){
-    text+='暂无分类数据。\n\n';
+    text+='  暂无分类数据。\n\n';
   }else{
     catNames.forEach((cat,idx)=>{
       const s=catStats[cat];
       const rate=s.count?Math.round(s.done/s.count*100):0;
-      text+=`${idx+1}. ${cat}类（共 ${s.count} 项，完成 ${s.done} 项，完成率 ${rate}%${s.important?`，含重要 ${s.important} 项`:''}）\n`;
+      text+=`  ${idx+1}. ${cat}类（共 ${s.count} 项，完成 ${s.done} 项，完成率 ${rate}%${s.important?`，含重要 ${s.important} 项`:''}）\n`;
       s.items.slice(0,5).forEach(it=>{
-        text+=`   · ${it.isImportant?'★ ':''}${it.plan||'（未填写内容）'}${it.progress?` [${it.progress}]`:''}\n`;
+        const itemText=`     · ${it.isImportant?'[重要] ':''}${it.plan||'（未填写内容）'}${it.progress?` [${it.progress}]`:''}`;
+        text+=(it.isImportant?'§RED§'+itemText+'§END§':itemText)+'\n';
       });
-      if(s.items.length>5)text+=`   · ...等共 ${s.items.length} 项\n`;
+      if(s.items.length>5)text+=`     · ...等共 ${s.items.length} 项\n`;
       text+='\n';
     });
   }
 
   // 五、工作关联分析（前因后果梳理）
-  text+=`五、工作关联分析（前因后果梳理）\n${'-'.repeat(38)}\n`;
+  text+=`五、工作关联分析（前因后果梳理）\n`;
   if(linkage.mainlines.length===0){
-    text+='本月工作较为分散，暂未识别出明显的工作主线。建议后续加强工作的连贯性与项目化推进。\n\n';
+    text+='  本月工作较为分散，暂未识别出明显的工作主线。建议后续加强工作的连贯性与项目化推进。\n\n';
   }else{
-    text+='1. 工作主线识别：\n';
+    text+='  1. 工作主线识别：\n';
     linkage.mainlines.slice(0,3).forEach((m,i)=>{
-      text+=`   ${i+1}) 「${m.category}」类工作贯穿 ${m.firstDate} 至 ${m.lastDate}（跨度 ${m.span} 天），累计 ${m.itemCount} 项，分布 ${m.dateCount} 个工作日，是本月核心工作方向。\n`;
+      text+=`     ${i+1}) 「${m.category}」类工作贯穿 ${m.firstDate} 至 ${m.lastDate}（跨度 ${m.span} 天），累计 ${m.itemCount} 项，分布 ${m.dateCount} 个工作日，是本月核心工作方向。\n`;
     });
     text+='\n';
 
     if(linkage.causalChains.length>0){
-      text+='2. 推进脉络与因果链：\n';
+      text+='  2. 推进脉络与因果链：\n';
       linkage.causalChains.slice(0,2).forEach((c,i)=>{
-        text+=`   ${i+1}) 「${c.category}」工作呈现"调研→行动→交付"推进路径：\n`;
+        text+=`     ${i+1}) 「${c.category}」工作呈现"调研→行动→交付"推进路径：\n`;
         if(c.research.length>0){
-          text+=`      · 前期调研：${c.research.length} 项（如 ${c.research[0].date}：${(c.research[0].plan||'').substring(0,30)}）\n`;
+          text+=`        · 前期调研：${c.research.length} 项（如 ${c.research[0].date}：${(c.research[0].plan||'').substring(0,30)}）\n`;
         }
         if(c.action.length>0){
-          text+=`      · 中期行动：${c.action.length} 项（如 ${c.action[0].date}：${(c.action[0].plan||'').substring(0,30)}）\n`;
+          text+=`        · 中期行动：${c.action.length} 项（如 ${c.action[0].date}：${(c.action[0].plan||'').substring(0,30)}）\n`;
         }
         if(c.delivery.length>0){
-          text+=`      · 后期交付：${c.delivery.length} 项（如 ${c.delivery[0].date}：${(c.delivery[0].plan||'').substring(0,30)}）\n`;
+          text+=`        · 后期交付：${c.delivery.length} 项（如 ${c.delivery[0].date}：${(c.delivery[0].plan||'').substring(0,30)}）\n`;
         }
         text+='\n';
       });
     }
 
     if(linkage.importantTrace.length>0){
-      text+='3. 重点任务推进脉络：\n';
+      text+='  3. 重点任务推进脉络：\n';
       linkage.importantTrace.forEach(it=>{
-        text+=`   · ${it.date}：${(it.plan||'').substring(0,30)}${it.done?' ✓ 已完成':'（进行中）'}\n`;
+        text+=`     · ${it.date}：${(it.plan||'').substring(0,30)}${it.done?' ✓ 已完成':'（进行中）'}\n`;
       });
       text+='\n';
     }
   }
 
-  // 跨天延续任务分析（作为工作关联分析的延伸）
-  text+=buildCrossDayAnalysisText(crossDayTasks)+'\n';
-
   // 六、外勤工作专题汇总
-  text+=`六、外勤工作专题汇总\n${'-'.repeat(38)}\n`;
+  text+=`六、外勤工作专题汇总\n`;
   if(fieldRecords.length===0){
-    text+='本月无外勤记录。\n\n';
+    text+='  本月无外勤记录。\n\n';
   }else{
-    text+=`本月外勤共计 ${fieldDays} 天，具体安排如下：\n\n`;
+    text+=`  本月外勤共计 ${fieldDays} 天，具体安排如下：\n\n`;
     fieldRecords.forEach((f,idx)=>{
-      text+=`${idx+1}. ${f.date} ${weekdayCN(f.date)}\n`;
-      if(f.place)text+=`   地点：${f.place}\n`;
-      if(f.note)text+=`   事项：${f.note}\n`;
+      text+=`  ${idx+1}. ${f.date} ${weekdayCN(f.date)}\n`;
+      if(f.place)text+=`     地点：${f.place}\n`;
+      if(f.note)text+=`     事项：${f.note}\n`;
       const items=(f.records||[]).filter(x=>x.plan||x.result);
       if(items.length>0){
-        text+=`   当日工作：\n`;
-        items.forEach(it=>text+=`     · ${it.isImportant?'★ ':''}${it.plan||'工作项'}${it.progress?` [${it.progress}]`:''}\n`);
+        text+=`     当日工作：\n`;
+        items.forEach(it=>{
+          const itemText=`       · ${it.isImportant?'[重要] ':''}${it.plan||'工作项'}${it.progress?` [${it.progress}]`:''}`;
+          text+=(it.isImportant?'§RED§'+itemText+'§END§':itemText)+'\n';
+        });
       }
       text+='\n';
     });
   }
 
   // 七、存在问题与改进建议
-  text+=`七、存在问题与改进建议\n${'-'.repeat(38)}\n`;
+  text+=`七、存在问题与改进建议\n`;
   if(problems.length===0){
-    text+='本月工作整体顺利，暂无明显问题记录。建议持续保持，同时可主动思考流程优化点。\n\n';
+    text+='  本月工作整体顺利，暂无明显问题记录。建议持续保持，同时可主动思考流程优化点。\n\n';
   }else{
     problems.forEach((p,idx)=>{
-      text+=`${idx+1}. 【${p.date}】${p.isImportant?'[重要] ':''}${(p.plan||'相关工作')}：\n`;
-      text+=`   情况：${(p.desc||'').substring(0,80)}\n\n`;
+      const line=`  ${idx+1}. 【${p.date}】${p.isImportant?'[重要] ':''}${(p.plan||'相关工作')}：`;
+      text+=(p.isImportant?'§RED§'+line+'§END§':line)+'\n';
+      text+=`     情况：${(p.desc||'').substring(0,80)}\n\n`;
     });
-    text+='改进建议：\n';
-    text+='  · 针对未完成事项，梳理原因并制定追赶计划；\n';
-    text+='  · 对重复出现的问题，考虑建立标准化流程；\n';
-    text+='  · 对外勤密集时段，提前统筹路线与准备资料，提升外出效率。\n\n';
+    text+='  改进建议：\n';
+    text+='    · 针对未完成事项，梳理原因并制定追赶计划；\n';
+    text+='    · 对重复出现的问题，考虑建立标准化流程；\n';
+    text+='    · 对外勤密集时段，提前统筹路线与准备资料，提升外出效率。\n\n';
   }
 
   // 八、下一步工作方向指导
-  text+=`八、下一步工作方向指导\n${'-'.repeat(38)}\n`;
-  directionGuidance.forEach(g=>{ text+=g+'\n'; });
+  text+=`八、下一步工作方向指导\n`;
+  directionGuidance.forEach(g=>{ text+='  '+g+'\n'; });
   text+='\n';
 
   // 九、月度工作亮点
-  text+=`九、月度工作亮点\n${'-'.repeat(38)}\n`;
+  text+=`九、月度工作亮点\n`;
   if(totalRecords===0){
-    text+='本月暂无记录。\n\n';
+    text+='  本月暂无记录。\n\n';
   }else{
     let idx=1;
-    if(completeRate>=80)text+=`${idx++}. 整体完成率达 ${completeRate}%，执行进度良好，交付稳定。\n`;
-    if(completed.length>=5)text+=`${idx++}. 单月完成工作 ${completed.length} 项，产出效率较高。\n`;
-    if(importantCount>0)text+=`${idx++}. 标记重要任务 ${importantCount} 项，工作重点明确，主次清晰。\n`;
+    if(completeRate>=80)text+=`  ${idx++}. 整体完成率达 ${completeRate}%，执行进度良好，交付稳定。\n`;
+    if(completed.length>=5)text+=`  ${idx++}. 单月完成工作 ${completed.length} 项，产出效率较高。\n`;
+    if(importantCount>0)text+=`  ${idx++}. 标记重要任务 ${importantCount} 项，工作重点明确，主次清晰。\n`;
     const doneItems=allRecords.filter(x=>x.result&&x.result.length>10);
     if(doneItems.length>0){
-      text+=`${idx++}. 多项工作取得实质性成果：\n`;
-      doneItems.slice(0,3).forEach(it=>text+=`     · ${it.isImportant?'★ ':''}${(it.plan||'').substring(0,20)}${(it.result||'').length>0?' → '+it.result.substring(0,40):''}\n`);
+      text+=`  ${idx++}. 多项工作取得实质性成果：\n`;
+      doneItems.slice(0,3).forEach(it=>text+=`       · ${it.isImportant?'[重要] ':''}${(it.plan||'').substring(0,20)}${(it.result||'').length>0?' → '+it.result.substring(0,40):''}\n`);
     }
-    if(Object.keys(catStats).length>=3)text+=`${idx++}. 工作覆盖面广，涉及 ${Object.keys(catStats).length} 个工作类别，综合能力提升。\n`;
-    if(idx===1)text+=`1. 本月共记录 ${totalRecords} 项工作，日常工作稳步推进。\n`;
+    if(Object.keys(catStats).length>=3)text+=`  ${idx++}. 工作覆盖面广，涉及 ${Object.keys(catStats).length} 个工作类别，综合能力提升。\n`;
+    if(idx===1)text+=`  1. 本月共记录 ${totalRecords} 项工作，日常工作稳步推进。\n`;
     text+='\n';
   }
 
   // 十、下月工作计划
   const monthKey=ym;
   const savedMonthPlan=DB.get('plan_month_'+monthKey,'');
-  text+=`十、下月工作计划\n${'-'.repeat(38)}\n`;
-  text+=(savedMonthPlan||'（请在下月计划输入区填写重点工作规划）')+'\n';
+  text+=`十、下月工作计划\n`;
+  text+=`  ${(savedMonthPlan||'（请在下月计划输入区填写重点工作规划）').replace(/\n/g,'\n  ')}\n`;
 
   // ========== HTML 渲染 ==========
+  lastMonthlyRawText=text;
   html+=`
   <div class="card">
     <div class="card-title"><span class="emoji">📄</span>月度工作总结报告</div>
-    <div class="report-text">${esc(text)}</div>
+    <div class="report-text">${formatReportHTML(text)}</div>
   </div>`;
 
   // 重点任务卡片（突出展示）
@@ -2246,24 +2249,6 @@ function buildMonthlyHTML(ym,data){
     <div class="card-title"><span class="emoji">📅</span>任务甘特图</div>
     ${buildGanttHTML(chains,monthStart,monthEnd)}
     </div>`;
-  }
-
-  // 跨天延续分析卡片
-  if(crossDayTasks.length>0){
-    html+=`<div class="card" style="border-left:4px solid #f59e0b">
-    <div class="card-title" style="color:#b45309"><span class="emoji">⏳</span>跨天延续任务分析（${crossDayTasks.length} 项）</div>
-    <div style="font-size:13px;line-height:1.7">
-    ${crossDayTasks.map(c=>{
-      const statusColor=c.isDone?'#10b981':(c.isOverdue?'#ef4444':'#3b82f6');
-      const statusText=c.isDone?'已完成':(c.isOverdue?'超期':'进行中');
-      return `<div style="margin-bottom:8px;padding:8px;background:#fffbeb;border-radius:8px">
-        <div style="font-weight:600;color:#92400e">${c.isImportant?'★ ':''}${esc((c.mainPlan||'').substring(0,30))}</div>
-        <div style="font-size:12px;color:#666;margin-top:3px">${c.startDate} ~ ${c.endDate}（${c.spanDays}天，计划${c.planDays}天）<span style="color:${statusColor};font-weight:600"> ${statusText}</span></div>
-        ${!c.hasReason?'<div style="font-size:11px;color:#ef4444;margin-top:3px">⚠ 延续原因未注明，建议补充说明为何延续</div>':'<div style="font-size:11px;color:#10b981;margin-top:3px">✓ 延续原因已记录</div>'}
-      </div>`;
-    }).join('')}
-    </div>
-  </div>`;
   }
 
   // 下一步方向指导卡片
@@ -2403,11 +2388,12 @@ function exportReport(type,fmt){
     data=getAllRecords().filter(r=>r.date>=start&&r.date<=end).sort((a,b)=>a.date.localeCompare(b.date));
     prefix='周报_'+start+'_'+end;
     periodStart=start;periodEnd=end;
-    let weeklyText=document.querySelector('#weeklyContent .report-text').textContent;
+    let weeklyText=lastWeeklyRawText;
     const planInput=document.getElementById('weeklyPlanInput');
     if(planInput){
       const pv=planInput.value.trim();
-      weeklyText=weeklyText.replace(/五、下周计划\n[\s\S]*$/,'五、下周计划\n'+(pv||'（请补充下周重点工作安排）'));
+      const planContent=(pv||'（请补充下周重点工作安排）').replace(/\n/g,'\n  ');
+      weeklyText=weeklyText.replace(/四、下周计划\n[\s\S]*$/,'四、下周计划\n  '+planContent+'\n');
     }
     text=weeklyText;
   }else{
@@ -2417,18 +2403,12 @@ function exportReport(type,fmt){
     data=getAllRecords().filter(r=>r.date>=start&&r.date<=end).sort((a,b)=>a.date.localeCompare(b.date));
     prefix='月报_'+ym;
     periodStart=start;periodEnd=end;
-    let monthlyText=document.querySelector('#monthlyContent .report-text').textContent;
+    let monthlyText=lastMonthlyRawText;
     const planInput=document.getElementById('monthlyPlanInput');
     if(planInput){
       const pv=planInput.value.trim();
-      // 兼容新结构（十、下月工作计划）、过渡结构（八、下月工作计划）和旧结构（五、下月计划）
-      if(/十、下月工作计划/.test(monthlyText)){
-        monthlyText=monthlyText.replace(/十、下月工作计划\n[\s\S]*$/,'十、下月工作计划\n--------------------------------------\n'+(pv||'（请在下月计划输入区填写重点工作规划）'));
-      }else if(/八、下月工作计划/.test(monthlyText)){
-        monthlyText=monthlyText.replace(/八、下月工作计划\n[\s\S]*$/,'八、下月工作计划\n--------------------------------------\n'+(pv||'（请在下月计划输入区填写重点工作规划）'));
-      }else{
-        monthlyText=monthlyText.replace(/五、下月计划\n[\s\S]*$/,'五、下月计划\n'+(pv||'（请补充下月重点工作规划）'));
-      }
+      const planContent=(pv||'（请在下月计划输入区填写重点工作规划）').replace(/\n/g,'\n  ');
+      monthlyText=monthlyText.replace(/十、下月工作计划\n[\s\S]*$/,'十、下月工作计划\n  '+planContent+'\n');
     }
     text=monthlyText;
   }
@@ -2457,7 +2437,7 @@ function downloadGantt(data,prefix,periodStart,periodEnd){
   html+='td.empty{background:#fafafa}.legend{margin-top:15px;font-size:12px;color:#666}.legend span{display:inline-block;margin-right:15px;padding:3px 8px;border-radius:3px;color:#fff;font-weight:600}';
   html+='table.detail{margin-top:20px}table.detail th{background:#6b7280}table.detail td{text-align:left}';
   html+='</style></head><body>';
-  html+='<h2>任务甘特图</h2>';
+  html+='<h2>'+(pf.company?esc(pf.company)+' · ':'')+'任务甘特图</h2>';
   html+='<div class="info">姓名：'+esc(pf.name||'-')+'　部门：'+esc(pf.dept||'-')+'　周期：'+periodStart+' 至 '+periodEnd+'　导出日期：'+todayStr()+'</div>';
   // 甘特图表格
   html+='<table><thead><tr><th>任务名称</th>';
@@ -2522,8 +2502,8 @@ function downloadGantt(data,prefix,periodStart,periodEnd){
 function downloadCSV(data,prefix){
   const pf=DB.get('profile',{});
   let rows=[];
-  rows.push(['工作周报记录表']);
-  rows.push(['姓名',pf.name||'','部门',pf.dept||'','岗位',pf.position||'']);
+  rows.push([(pf.company||'')+'工作周报记录表']);
+  rows.push(['公司',pf.company||'','姓名',pf.name||'','部门',pf.dept||'','岗位',pf.position||'']);
   rows.push(['日期','星期','是否休息日','是否外勤','外勤地点','外勤事项','是否重要任务','计划天数','是否关联任务','工作计划/内容','完成进度','工作成果/备注']);
   data.forEach(r=>{
     const isRest=r.isRestDay===true;
@@ -2544,11 +2524,16 @@ function downloadCSV(data,prefix){
 }
 function downloadDOC(text,prefix){
   const pf=DB.get('profile',{});
+  const formattedText=esc(text).replace(/§RED§/g,'<span style="color:red;font-weight:bold">').replace(/§END§/g,'</span>');
   const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${prefix}</title>
-  <style>body{font-family:'宋体',SimSun,serif;font-size:14px;line-height:1.8;padding:40px}
-  h1{text-align:center;font-size:20px}table{border-collapse:collapse;width:100%;margin:10px 0}
-  td,th{border:1px solid #999;padding:6px;font-size:12px}</style></head>
-  <body><pre style="white-space:pre-wrap;font-family:inherit">${esc(text)}</pre></body></html>`;
+  <style>
+  body{font-family:'宋体',SimSun,serif;font-size:14px;line-height:1.8;padding:50px 60px;max-width:780px;margin:0 auto;color:#222}
+  pre{white-space:pre-wrap;font-family:inherit;margin:0}
+  .doc-title{font-size:22px;font-weight:bold;text-align:center;margin-bottom:6px;letter-spacing:2px}
+  .doc-meta{text-align:center;font-size:13px;color:#444;margin-bottom:4px}
+  .doc-divider{text-align:center;color:#888;margin:10px 0 20px;letter-spacing:-1px}
+  </style></head>
+  <body><pre>${formattedText}</pre></body></html>`;
   const blob=new Blob(['\ufeff',html],{type:'application/msword'});
   triggerDownload(blob,prefix+'.doc');
   showToast('✓ 已导出 '+prefix+'.doc');
