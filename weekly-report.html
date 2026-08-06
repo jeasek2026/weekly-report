@@ -639,29 +639,44 @@ function renderSettings(){
   document.getElementById('setGestureRow').style.display = lockCfg.mode==='gesture'?'flex':'none';
 }
 function toggleLockEnabled(){
-  lockCfg.enabled=!lockCfg.enabled;
-  if(lockCfg.enabled){
-    if(lockCfg.mode==='password' && !lockCfg.pwd){ resetPassword(); }
-    else if(lockCfg.mode==='gesture' && !lockCfg.gesture){ resetGesture(); }
-    else { DB.set('lockCfg',lockCfg); showToast('已开启锁屏'); }
-  }else{ DB.set('lockCfg',lockCfg); showToast('已关闭锁屏'); }
+  if(!lockCfg.enabled){
+    // 开启锁屏：密码方式需先设置密码，设置失败则不开启
+    if(lockCfg.mode==='password' && !lockCfg.pwd){
+      const ok=resetPassword();
+      if(!ok){ showToast('未设置密码，锁屏未开启'); renderSettings(); return; }
+    }else if(lockCfg.mode==='gesture' && !lockCfg.gesture){
+      lockCfg.enabled=true; DB.set('lockCfg',lockCfg);
+      resetGesture(); renderSettings(); return;
+    }
+    lockCfg.enabled=true; DB.set('lockCfg',lockCfg); showToast('已开启锁屏');
+  }else{
+    lockCfg.enabled=false; DB.set('lockCfg',lockCfg); showToast('已关闭锁屏');
+  }
   renderSettings();
 }
 function changeLockMode(){
-  lockCfg.mode=document.getElementById('setLockMode').value;
-  if(lockCfg.mode==='password' && !lockCfg.pwd){ resetPassword(); }
-  else if(lockCfg.mode==='gesture' && !lockCfg.gesture){ resetGesture(); }
-  else { DB.set('lockCfg',lockCfg); }
+  const newMode=document.getElementById('setLockMode').value;
+  if(newMode===lockCfg.mode){return;}
+  if(newMode==='password' && !lockCfg.pwd){
+    const ok=resetPassword();
+    if(!ok){ document.getElementById('setLockMode').value=lockCfg.mode||'password'; return; }
+  }else if(newMode==='gesture' && !lockCfg.gesture){
+    lockCfg.mode=newMode; DB.set('lockCfg',lockCfg);
+    resetGesture(); renderSettings(); return;
+  }else{
+    lockCfg.mode=newMode; DB.set('lockCfg',lockCfg);
+  }
   renderSettings();
 }
 function resetPassword(){
   const p=prompt('请输入新密码（数字或字母）：');
-  if(p===null)return;
-  if(p.length<1){showToast('密码不能为空');return;}
+  if(p===null)return false;
+  if(p.length<1){showToast('密码不能为空');return false;}
   const p2=prompt('请再次输入确认：');
-  if(p!==p2){showToast('两次输入不一致');return;}
+  if(p!==p2){showToast('两次输入不一致');return false;}
   lockCfg.pwd=p;lockCfg.mode='password';DB.set('lockCfg',lockCfg);
   showToast('密码已设置');renderSettings();
+  return true;
 }
 function resetGesture(){
   closeSettings();
