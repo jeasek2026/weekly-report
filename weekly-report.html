@@ -1586,7 +1586,7 @@ function buildWeeklyHTML(start,end,data){
   text+=`二、每日工作明细\n`;
   data.forEach(r=>{
     const isRest=r.isRestDay===true;
-    text+=`\n  §RED§【${r.date} ${weekdayCN(r.date)}】§END§${r.field?'（外勤：'+(r.fieldPlace||'）':'')}${isRest?'（休息日）':''}\n`;
+    text+=`\n  §RED§【${r.date} ${weekdayCN(r.date)}】§END§${r.field?'（外勤：'+(r.fieldPlace||'）'):''}${isRest?'（休息日）':''}\n`;
     const recs=(r.records||[]).filter(x=>x.plan||x.progress||x.result);
     if(recs.length===0&&isRest){
       text+=`    休息日，无工作记录。\n`;
