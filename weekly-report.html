@@ -477,7 +477,7 @@
       <button class="add-record-btn" onclick="addRecord()">+ 添加一条工作记录</button>
     </div>
 
-    <button class="btn btn-primary" onclick="saveDaily()">💾 保存今日记录</button>
+    <button id="saveDailyBtn" class="btn btn-primary" onclick="saveDaily()">💾 保存今日记录</button>
   </div>
 
   <!-- 岗位信息 -->
@@ -1211,8 +1211,9 @@ function loadDaily(){
   state.curRecords.forEach(r=>{ if(!r.taskId) r.taskId='T'+Date.now()+'_'+Math.random().toString(36).substr(2,6); });
   // 每日记录/每日计划标题切换：今日及以前=每日记录；未来=每日计划
   const vtEl=document.getElementById('viewTitle');
-  if(state.curDate>todayStr()){ vtEl.textContent='每日计划'; saveBtn.textContent='💾 保存今日计划'; }
-  else { vtEl.textContent='每日记录'; saveBtn.textContent='💾 保存今日记录'; }
+  const saveBtnEl=document.getElementById('saveDailyBtn');
+  if(state.curDate>todayStr()){ vtEl.textContent='每日计划'; if(saveBtnEl)saveBtnEl.textContent='💾 保存今日计划'; }
+  else { vtEl.textContent='每日记录'; if(saveBtnEl)saveBtnEl.textContent='💾 保存今日记录'; }
   renderRestDayBanner();
   renderFieldSwitch();
   renderRecords();
