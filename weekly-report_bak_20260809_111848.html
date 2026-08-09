@@ -1,0 +1,2969 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#4f46e5">
+<title>工作周报工具</title>
+<style>
+  :root{
+    --primary:#4f46e5;
+    --primary-dark:#4338ca;
+    --primary-light:#eef2ff;
+    --accent:#06b6d4;
+    --bg:#f3f4f6;
+    --card:#ffffff;
+    --text:#1f2937;
+    --text-light:#6b7280;
+    --border:#e5e7eb;
+    --success:#10b981;
+    --warning:#f59e0b;
+    --danger:#ef4444;
+    --shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04);
+    --shadow-lg:0 10px 25px rgba(0,0,0,.1);
+    --radius:14px;
+    --radius-sm:10px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    font-size:15px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* ===== 锁屏 ===== */
+  #lockScreen{
+    position:fixed;inset:0;z-index:100;
+    background:linear-gradient(145deg,#4f46e5 0%,#7c3aed 50%,#06b6d4 100%);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:24px;color:#fff;
+  }
+  .lock-logo{
+    width:84px;height:84px;border-radius:24px;
+    background:rgba(255,255,255,.15);
+    backdrop-filter:blur(10px);
+    display:flex;align-items:center;justify-content:center;
+    font-size:40px;margin-bottom:16px;
+    border:1px solid rgba(255,255,255,.2);
+  }
+  .lock-title{font-size:22px;font-weight:700;margin-bottom:6px}
+  .lock-sub{font-size:13px;opacity:.8;margin-bottom:30px}
+  .lock-toggle{font-size:13px;opacity:.85;margin-top:24px;cursor:pointer;text-decoration:underline}
+  /* 密码输入 */
+  .pwd-wrap{display:flex;flex-direction:column;align-items:center;gap:14px;width:100%;max-width:280px}
+  .pwd-input{
+    width:100%;padding:14px 18px;border-radius:var(--radius);
+    border:none;background:rgba(255,255,255,.18);color:#fff;
+    font-size:18px;text-align:center;letter-spacing:8px;
+    backdrop-filter:blur(10px);outline:none;
+  }
+  .pwd-input::placeholder{color:rgba(255,255,255,.6);letter-spacing:1px}
+  .btn-unlock{
+    width:100%;padding:14px;border-radius:var(--radius);border:none;
+    background:#fff;color:var(--primary);font-size:16px;font-weight:600;cursor:pointer;
+    transition:transform .1s;
+  }
+  .btn-unlock:active{transform:scale(.97)}
+  /* 手势解锁 */
+  #gestureCanvas{
+    background:rgba(255,255,255,.08);
+    border-radius:20px;border:1px solid rgba(255,255,255,.15);
+    touch-action:none;cursor:pointer;
+  }
+  .gesture-hint{font-size:13px;opacity:.85;margin-top:14px;min-height:18px}
+
+  /* ===== 主应用 ===== */
+  #app{display:none;min-height:100vh;padding-bottom:80px}
+  .app-header{
+    background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+    color:#fff;padding:18px 16px 16px;
+    position:sticky;top:0;z-index:20;
+    box-shadow:var(--shadow);
+  }
+  .app-header .top-row{display:flex;align-items:center;justify-content:space-between}
+  .app-header h1{font-size:18px;font-weight:600}
+  .header-actions{display:flex;gap:8px}
+  .icon-btn{
+    width:36px;height:36px;border-radius:10px;border:none;
+    background:rgba(255,255,255,.18);color:#fff;font-size:16px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .icon-btn:active{background:rgba(255,255,255,.3)}
+  .header-tabs{display:flex;gap:6px;margin-top:14px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .header-tabs::-webkit-scrollbar{display:none}
+  .tab{
+    padding:7px 14px;border-radius:20px;font-size:13px;white-space:nowrap;
+    background:rgba(255,255,255,.15);color:rgba(255,255,255,.85);border:none;cursor:pointer;
+    transition:.2s;
+  }
+  .tab.active{background:#fff;color:var(--primary);font-weight:600}
+
+  .view{display:none;padding:16px;animation:fade .25s}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .card{
+    background:var(--card);border-radius:var(--radius);padding:16px;
+    box-shadow:var(--shadow);margin-bottom:14px;
+  }
+  .card-title{font-size:16px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+  .card-title .emoji{font-size:19px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:13px;color:var(--text-light);margin-bottom:6px;font-weight:500;letter-spacing:.2px}
+  .field input,.field select,.field textarea{
+    width:100%;padding:11px 13px;border:1px solid var(--border);border-radius:var(--radius-sm);
+    font-size:15px;font-family:inherit;background:#fff;color:var(--text);outline:none;
+    transition:border .2s;line-height:1.5;
+  }
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--primary)}
+  .field textarea{resize:vertical;min-height:72px;line-height:1.6}
+
+  .row2{display:flex;gap:12px}
+  .row2>.field{flex:1}
+
+  /* 开关 */
+  .switch-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0}
+  .switch-row .label{font-size:14px;font-weight:500}
+  .switch{
+    position:relative;width:48px;height:28px;background:#d1d5db;border-radius:14px;
+    cursor:pointer;transition:.25s;flex-shrink:0;
+  }
+  .switch.on{background:var(--success)}
+  .switch::after{
+    content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;
+    background:#fff;border-radius:50%;transition:.25s;box-shadow:0 1px 3px rgba(0,0,0,.2);
+  }
+  .switch.on::after{transform:translateX(20px)}
+
+  .btn{
+    padding:12px 18px;border-radius:var(--radius-sm);border:none;font-size:15px;
+    font-weight:600;cursor:pointer;transition:.15s;font-family:inherit;
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  }
+  .btn-primary{background:var(--primary);color:#fff;width:100%}
+  .btn-primary:active{background:var(--primary-dark)}
+  .btn-outline{background:transparent;border:1.5px solid var(--primary);color:var(--primary)}
+  .btn-ghost{background:var(--primary-light);color:var(--primary)}
+  .btn-success{background:var(--success);color:#fff}
+  .btn-sm{padding:8px 12px;font-size:13px}
+  .btn-block{width:100%}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap}
+  .btn-row>.btn{flex:1;min-width:120px}
+
+  /* 工作记录条目 */
+  .record-item{
+    border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;
+    margin-bottom:12px;background:#fafbfc;position:relative;
+  }
+  .record-item.is-important{
+    border-color:#f59e0b;background:#fffbeb;
+    box-shadow:0 0 0 1px rgba(245,158,11,.3);
+  }
+  .record-item .ri-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px}
+  .record-item .ri-head-left{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
+  .record-item .ri-num{font-size:13px;color:var(--text-light);font-weight:600;letter-spacing:.3px}
+  .ri-tasktype{
+    display:inline-block;font-size:12px;font-weight:600;
+    padding:3px 10px;border-radius:10px;letter-spacing:.3px;line-height:1.4;
+  }
+  .ri-important-toggle{
+    display:inline-flex;align-items:center;gap:4px;cursor:pointer;
+    font-size:12px;color:var(--text-light);user-select:none;
+    padding:4px 10px;border-radius:12px;background:#f3f4f6;transition:.2s;line-height:1.4;
+  }
+  .ri-important-toggle.on{
+    background:#fef3c7;color:#b45309;font-weight:600;
+  }
+  .ri-important-toggle .star{font-size:13px}
+  .ri-del{
+    width:28px;height:28px;border-radius:8px;border:none;background:#fee2e2;color:var(--danger);
+    font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  /* 缩小版字段：统一 select/input/textarea 的字号与间距，消除字体大小不一致 */
+  .field-mini label{font-size:12px;margin-bottom:4px}
+  .field-mini input,
+  .field-mini select,
+  .field-mini textarea{padding:9px 11px;font-size:14px;line-height:1.5}
+
+  /* 休息日提示 */
+  .rest-day-banner{
+    background:linear-gradient(135deg,#fef3c7,#fde68a);
+    border:1px solid #f59e0b;border-radius:var(--radius-sm);
+    padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;
+    font-size:13px;color:#92400e;
+  }
+  .rest-day-banner .rest-icon{font-size:22px}
+  .rest-day-banner .rest-text{flex:1;line-height:1.5}
+  .rest-day-banner .rest-toggle{
+    background:#fff;color:#92400e;border:1px solid #f59e0b;
+    padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;
+    white-space:nowrap;
+  }
+  .rest-day-banner .rest-toggle.on{background:#92400e;color:#fff;border-color:#92400e}
+
+  /* 计划天数与关联任务 */
+  .ri-meta-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .ri-meta-row>.field{flex:1;min-width:80px;margin-bottom:0}
+  .ri-plan-days{max-width:90px}
+  .ri-plan-days input{padding:8px 10px;text-align:center}
+  .ri-link-sel{flex:2;min-width:160px}
+  .ri-link-sel select{padding:8px 10px}
+  .ri-link-info{
+    font-size:12px;color:#0e7490;background:#ecfeff;border:1px solid #cffafe;
+    padding:6px 10px;border-radius:8px;margin-bottom:8px;line-height:1.55;
+  }
+  .ri-link-info .chain-tag{font-weight:600;margin-right:4px}
+
+  /* 甘特图 */
+  .gantt-wrap{overflow-x:auto;margin-top:8px;-webkit-overflow-scrolling:touch}
+  .gantt-chart{min-width:100%;font-size:11px}
+  .gantt-header{display:flex;border-bottom:2px solid var(--border);position:sticky;top:0;background:#fff;z-index:1}
+  .gantt-task-col{width:180px;min-width:180px;padding:6px 8px;font-weight:600;color:var(--text);border-right:1px solid var(--border);flex-shrink:0;position:sticky;left:0;background:#fff;z-index:2}
+  .gantt-day-header{flex:1;min-width:28px;text-align:center;padding:6px 0;color:var(--text-light);border-right:1px solid var(--border)}
+  .gantt-day-header.weekend{background:#fef3c7;color:#92400e}
+  .gantt-day-header.today{background:var(--primary-light);color:var(--primary);font-weight:600}
+  .gantt-row{display:flex;border-bottom:1px solid var(--border);align-items:center;min-height:32px}
+  .gantt-row:nth-child(even){background:#fafbfc}
+  .gantt-task-name{width:180px;min-width:180px;padding:4px 8px;font-size:11px;color:var(--text);border-right:1px solid var(--border);flex-shrink:0;position:sticky;left:0;background:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:2}
+  .gantt-task-name .gantt-star{color:#f59e0b}
+  .gantt-cells{flex:1;display:flex;position:relative}
+  .gantt-cell{flex:1;min-width:28px;border-right:1px solid #f3f4f6;min-height:32px}
+  .gantt-cell.weekend{background:#fffbeb}
+  .gantt-bar{
+    position:absolute;top:50%;transform:translateY(-50%);
+    height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;
+    font-size:10px;color:#fff;font-weight:600;overflow:hidden;white-space:nowrap;
+    box-shadow:0 1px 2px rgba(0,0,0,.15);transition:opacity .2s;
+  }
+  .gantt-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--text-light)}
+  .gantt-legend-item{display:flex;align-items:center;gap:4px}
+  .gantt-legend-dot{width:12px;height:12px;border-radius:3px}
+
+  .add-record-btn{
+    width:100%;padding:12px;border:1.5px dashed var(--primary);border-radius:var(--radius-sm);
+    background:var(--primary-light);color:var(--primary);font-size:14px;font-weight:600;
+    cursor:pointer;margin-top:4px;letter-spacing:.5px;
+  }
+
+  /* 外勤卡片 */
+  .field-card{border-left:3px solid var(--accent)}
+
+  /* 历史记录列表 */
+  .history-item{
+    background:var(--card);border-radius:var(--radius);padding:14px;margin-bottom:10px;
+    box-shadow:var(--shadow);cursor:pointer;transition:.15s;
+  }
+  .history-item:active{transform:scale(.99)}
+  .hi-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+  .hi-date{font-size:15px;font-weight:600}
+  .hi-badges{display:flex;gap:5px;flex-wrap:wrap}
+  .badge{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
+  .badge-field{background:#cffafe;color:#0e7490}
+  .badge-count{background:#e0e7ff;color:#4338ca}
+  .hi-preview{font-size:13px;color:var(--text-light);line-height:1.5;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .hi-actions{display:flex;gap:8px;margin-top:8px}
+  .hi-actions .btn{flex:1}
+
+  .empty{text-align:center;padding:40px 20px;color:var(--text-light)}
+  .empty .emoji{font-size:48px;display:block;margin-bottom:10px}
+
+  /* 报表 */
+  .report-block{margin-bottom:18px}
+  .report-block h3{font-size:14px;color:var(--text-light);margin-bottom:8px;font-weight:600}
+  .stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}
+  .stat-box{background:var(--primary-light);border-radius:var(--radius-sm);padding:14px;text-align:center}
+  .stat-box .num{font-size:24px;font-weight:700;color:var(--primary)}
+  .stat-box .lbl{font-size:12px;color:var(--text-light);margin-top:2px}
+  .bar-chart{display:flex;flex-direction:column;gap:8px}
+  .bar-row{display:flex;align-items:center;gap:8px;font-size:12px}
+  .bar-row .bar-lbl{width:60px;color:var(--text-light);flex-shrink:0}
+  .bar-track{flex:1;height:22px;background:#f3f4f6;border-radius:6px;overflow:hidden;position:relative}
+  .bar-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--accent));border-radius:6px;transition:width .5s}
+  .bar-row .bar-val{width:32px;text-align:right;font-weight:600;flex-shrink:0}
+
+  .report-text{
+    background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);
+    padding:18px 22px;font-size:13px;line-height:1.85;white-space:pre-wrap;
+    max-height:520px;overflow-y:auto;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#222;
+  }
+  .summary-card{background:linear-gradient(135deg,#ecfdf5,#d1fae5);border:1px solid #6ee7b7}
+  .summary-card .card-title{color:#065f46}
+
+  /* 设置页 */
+  .setting-item{
+    display:flex;align-items:center;justify-content:space-between;padding:14px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .setting-item:last-child{border-bottom:none}
+  .setting-item .si-lbl{font-size:14px}
+  .setting-item .si-desc{font-size:12px;color:var(--text-light);margin-top:2px}
+
+  .danger-btn{background:#fee2e2;color:var(--danger);width:100%}
+
+  /* 底部导航 */
+  .bottom-nav{
+    position:fixed;bottom:0;left:0;right:0;z-index:30;
+    background:#fff;border-top:1px solid var(--border);
+    display:flex;padding:6px 0 max(6px,env(safe-area-inset-bottom));
+    box-shadow:0 -2px 10px rgba(0,0,0,.05);
+  }
+  .nav-item{
+    flex:1;background:none;border:none;cursor:pointer;padding:6px 2px;
+    display:flex;flex-direction:column;align-items:center;gap:2px;
+    color:var(--text-light);font-size:11px;transition:.15s;
+  }
+  .nav-item.active{color:var(--primary)}
+  .nav-item .nav-icon{font-size:20px}
+
+  /* 弹窗 */
+  .modal-mask{
+    position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:50;
+    display:none;align-items:center;justify-content:center;padding:20px;
+  }
+  .modal-mask.show{display:flex}
+  .modal{
+    background:#fff;border-radius:var(--radius);padding:20px;width:100%;max-width:380px;
+    max-height:85vh;overflow-y:auto;animation:pop .2s;
+  }
+  @keyframes pop{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
+  .modal h3{font-size:17px;margin-bottom:14px}
+  .modal-actions{display:flex;gap:8px;margin-top:16px}
+  .modal-actions .btn{flex:1}
+
+  /* Toast */
+  .toast{
+    position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-60px);
+    background:rgba(31,41,55,.95);color:#fff;padding:10px 20px;border-radius:24px;
+    font-size:14px;z-index:200;opacity:0;transition:.3s;pointer-events:none;
+    max-width:90%;text-align:center;
+  }
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+  /* 日期选择条 */
+  .date-bar{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .date-bar input{flex:1}
+  .date-bar .nav-arrow{
+    width:38px;height:38px;border-radius:10px;border:1px solid var(--border);
+    background:#fff;cursor:pointer;font-size:16px;
+  }
+
+  @media(min-width:640px){
+    .stat-grid{grid-template-columns:repeat(4,1fr)}
+    #app{max-width:680px;margin:0 auto}
+    .app-header{max-width:680px;margin:0 auto}
+    .bottom-nav{max-width:680px;left:50%;transform:translateX(-50%)}
+  }
+
+  /* ===== 移动端优化：字号层级、间距、布局 ===== */
+  @media(max-width:639px){
+    body{font-size:16px}
+    .card{padding:14px;margin-bottom:12px;border-radius:12px}
+    .card-title{font-size:16px;margin-bottom:12px}
+    .card-title .emoji{font-size:18px}
+    .field{margin-bottom:14px}
+    .field label{font-size:14px;margin-bottom:6px}
+    .field input,.field select,.field textarea{
+      padding:12px 14px;font-size:16px;line-height:1.6;border-radius:12px;
+    }
+    .field textarea{min-height:80px}
+    .record-item{padding:14px;margin-bottom:12px;border-radius:12px}
+    .record-item .ri-head{margin-bottom:10px}
+    .record-item .ri-num{font-size:14px}
+    .ri-tasktype{font-size:13px;padding:3px 10px}
+    .ri-important-toggle{font-size:13px;padding:4px 10px}
+    .ri-important-toggle .star{font-size:14px}
+    .ri-del{width:32px;height:32px;font-size:15px}
+    /* meta 行改为纵向堆叠，避免横向挤压 */
+    .ri-meta-row{flex-direction:column;gap:10px;margin-bottom:10px}
+    .ri-meta-row>.field{flex:none;width:100%}
+    .ri-plan-days{max-width:100%}
+    .ri-plan-days input{text-align:left}
+    .ri-link-sel{flex:none;width:100%}
+    .field-mini label{font-size:14px;margin-bottom:5px}
+    .field-mini input,
+    .field-mini select,
+    .field-mini textarea{padding:11px 13px;font-size:16px;line-height:1.6}
+    .ri-link-info{font-size:13px;padding:8px 12px;margin-bottom:10px;line-height:1.6}
+    .add-record-btn{padding:13px;font-size:15px}
+    .btn{padding:14px 20px;font-size:16px}
+    .btn-sm{padding:10px 14px;font-size:14px}
+    .view{padding:14px}
+    .app-header{padding:16px 14px 14px}
+    .app-header h1{font-size:19px}
+    .tab{padding:8px 14px;font-size:14px}
+    .icon-btn{width:40px;height:40px;font-size:18px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== 锁屏 ===== -->
+<div id="lockScreen">
+  <div class="lock-logo">📋</div>
+  <div class="lock-title">工作周报工具</div>
+  <div class="lock-sub">规划与记录每日工作</div>
+
+  <div id="pwdPanel" class="pwd-wrap">
+    <input type="password" id="pwdInput" class="pwd-input" placeholder="请输入密码" maxlength="20" inputmode="numeric">
+    <button class="btn-unlock" onclick="unlockByPwd()">解 锁</button>
+  </div>
+
+  <div id="gesturePanel" style="display:none;flex-direction:column;align-items:center">
+    <canvas id="gestureCanvas" width="260" height="260"></canvas>
+    <div class="gesture-hint" id="gestureHint">请绘制手势密码</div>
+  </div>
+
+  <div class="lock-toggle" id="lockModeToggle" onclick="toggleLockMode()">切换为手势解锁</div>
+</div>
+
+<!-- ===== 主应用 ===== -->
+<div id="app">
+  <!-- 顶部 -->
+  <div class="app-header">
+    <div class="top-row">
+      <h1 id="viewTitle">每日记录</h1>
+      <div class="header-actions">
+        <button class="icon-btn" onclick="openSettings()" title="设置">⚙️</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 每日记录 -->
+  <div class="view active" id="view-daily">
+    <div class="date-bar">
+      <button class="nav-arrow" onclick="shiftDate(-1)">‹</button>
+      <input type="date" id="dailyDate" onchange="loadDaily()">
+      <button class="nav-arrow" onclick="shiftDate(1)">›</button>
+    </div>
+
+    <div class="rest-day-banner" id="restDayBanner" style="display:none">
+      <span class="rest-icon">🌴</span>
+      <div class="rest-text" id="restDayText">今日为周末休息日</div>
+      <button class="rest-toggle" id="restToggle" onclick="toggleRestDay()">有工作要记录</button>
+    </div>
+
+    <div class="card" id="positionHintCard" style="display:none">
+      <div class="card-title"><span class="emoji">👤</span>岗位信息未填写</div>
+      <p style="font-size:13px;color:var(--text-light);margin-bottom:10px">首次使用请填写岗位信息，填写后无需重复填写。</p>
+      <button class="btn btn-outline btn-sm" onclick="switchView('profile');scrollTo(0,0)">前往填写</button>
+    </div>
+
+    <div class="card">
+      <div class="switch-row">
+        <span class="label">🌐 今日外勤</span>
+        <div class="switch" id="fieldSwitch" onclick="toggleField()"></div>
+      </div>
+      <div id="fieldDetail" style="display:none;margin-top:10px">
+        <div class="field">
+          <label>外勤地点</label>
+          <input type="text" id="fieldPlace" placeholder="如：客户公司、外出会议地点">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>外勤事项</label>
+          <textarea id="fieldNote" placeholder="外勤工作内容、会见对象等"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="emoji">📝</span>工作记录</div>
+      <div id="recordList"></div>
+      <button class="add-record-btn" onclick="addRecord()">+ 添加一条工作记录</button>
+    </div>
+
+    <button class="btn btn-primary" onclick="saveDaily()">💾 保存今日记录</button>
+  </div>
+
+  <!-- 岗位信息 -->
+  <div class="view" id="view-profile">
+    <div class="card">
+      <div class="card-title"><span class="emoji">👤</span>岗位信息</div>
+      <p style="font-size:13px;color:var(--text-light);margin-bottom:12px">填写一次即可，岗位变动时可随时修改。</p>
+      <div class="field">
+        <label>公司名称</label>
+        <input type="text" id="pfCompany" placeholder="您的公司名称">
+      </div>
+      <div class="field">
+        <label>姓名</label>
+        <input type="text" id="pfName" placeholder="您的姓名">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>部门</label>
+          <input type="text" id="pfDept" placeholder="所在部门">
+        </div>
+        <div class="field">
+          <label>岗位/职务</label>
+          <input type="text" id="pfPosition" placeholder="如：产品经理">
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>工号(选填)</label>
+          <input type="text" id="pfEmpNo" placeholder="员工工号">
+        </div>
+        <div class="field">
+          <label>联系电话(选填)</label>
+          <input type="text" id="pfPhone" placeholder="手机号">
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>备注(选填)</label>
+        <textarea id="pfNote" placeholder="其他需要说明的信息"></textarea>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="saveProfile()">💾 保存岗位信息</button>
+  </div>
+
+  <!-- 历史记录 -->
+  <div class="view" id="view-history">
+    <div class="card" style="padding:12px">
+      <div class="btn-row">
+        <button class="btn btn-ghost btn-sm" onclick="setHistFilter('all')">全部</button>
+        <button class="btn btn-ghost btn-sm" onclick="setHistFilter('field')">外勤</button>
+        <button class="btn btn-ghost btn-sm" onclick="setHistFilter('week')">本周</button>
+      </div>
+    </div>
+    <div id="historyList"></div>
+  </div>
+
+  <!-- 周报 -->
+  <div class="view" id="view-weekly">
+    <div class="date-bar">
+      <button class="nav-arrow" onclick="shiftWeek(-1)">‹</button>
+      <input type="week" id="weekPicker" onchange="renderWeekly()">
+      <button class="nav-arrow" onclick="shiftWeek(1)">›</button>
+    </div>
+    <div id="weeklyContent"></div>
+  </div>
+
+  <!-- 月报 -->
+  <div class="view" id="view-monthly">
+    <div class="date-bar">
+      <button class="nav-arrow" onclick="shiftMonth(-1)">‹</button>
+      <input type="month" id="monthPicker" onchange="renderMonthly()">
+      <button class="nav-arrow" onclick="shiftMonth(1)">›</button>
+    </div>
+    <div id="monthlyContent"></div>
+  </div>
+</div>
+
+<!-- 底部导航 -->
+<div class="bottom-nav" id="bottomNav" style="display:none">
+  <button class="nav-item active" data-view="daily" onclick="switchView('daily')">
+    <span class="nav-icon">📝</span><span>记录</span>
+  </button>
+  <button class="nav-item" data-view="history" onclick="switchView('history')">
+    <span class="nav-icon">📅</span><span>历史</span>
+  </button>
+  <button class="nav-item" data-view="weekly" onclick="switchView('weekly')">
+    <span class="nav-icon">📊</span><span>周报</span>
+  </button>
+  <button class="nav-item" data-view="monthly" onclick="switchView('monthly')">
+    <span class="nav-icon">📈</span><span>月报</span>
+  </button>
+  <button class="nav-item" data-view="profile" onclick="switchView('profile')">
+    <span class="nav-icon">👤</span><span>我的</span>
+  </button>
+</div>
+
+<!-- 设置弹窗 -->
+<div class="modal-mask" id="settingsModal">
+  <div class="modal">
+    <h3>⚙️ 设置</h3>
+    <div class="setting-item">
+      <div>
+        <div class="si-lbl">启用锁屏密码</div>
+        <div class="si-desc">保护您的工作记录隐私</div>
+      </div>
+      <div class="switch" id="setLockSwitch" onclick="toggleLockEnabled()"></div>
+    </div>
+    <div class="setting-item">
+      <div>
+        <div class="si-lbl">解锁方式</div>
+        <div class="si-desc">密码 或 手势</div>
+      </div>
+      <select id="setLockMode" onchange="changeLockMode()" style="padding:8px;border-radius:8px;border:1px solid var(--border);font-size:14px">
+        <option value="password">密码</option>
+        <option value="gesture">手势</option>
+      </select>
+    </div>
+    <div class="setting-item" id="setPwdRow">
+      <div>
+        <div class="si-lbl">修改密码</div>
+        <div class="si-desc">设置新的解锁密码</div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="resetPassword()">修改</button>
+    </div>
+    <div class="setting-item" id="setGestureRow" style="display:none">
+      <div>
+        <div class="si-lbl">修改手势密码</div>
+        <div class="si-desc">重新绘制手势</div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="resetGesture()">修改</button>
+    </div>
+    <div class="setting-item">
+      <div>
+        <div class="si-lbl">☁️ 云端同步</div>
+        <div class="si-desc" id="cloudSyncStatus">手机电脑数据互通</div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="openCloudConfig()">配置</button>
+    </div>
+    <div class="setting-item">
+      <div>
+        <div class="si-lbl">导出全部数据</div>
+        <div class="si-desc">备份为表格文件</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="exportAllCSV()">导出</button>
+    </div>
+    <div class="setting-item">
+      <div>
+        <div class="si-lbl">清空所有数据</div>
+        <div class="si-desc">不可恢复，请谨慎</div>
+      </div>
+      <button class="btn danger-btn btn-sm" onclick="clearAllData()" style="width:auto">清空</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeSettings()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 云端同步弹窗 -->
+<div class="modal-mask" id="cloudModal">
+  <div class="modal">
+    <h3>☁️ 云端同步设置</h3>
+    <div class="field">
+      <label>使用者用户名（用于多人数据隔离）</label>
+      <input type="text" id="cfgUserId" placeholder="如：张三、zhangsan">
+    </div>
+    <div class="field">
+      <label>Gitee 用户名</label>
+      <input type="text" id="cfgOwner" placeholder="如 zhou-shuangxi2026">
+    </div>
+    <div class="field">
+      <label>仓库名</label>
+      <input type="text" id="cfgRepo" placeholder="如 weekly-report-data">
+    </div>
+    <div class="field">
+      <label>私人令牌</label>
+      <input type="password" id="cfgToken" placeholder="Gitee 私人令牌">
+    </div>
+    <div class="field">
+      <label>分支名</label>
+      <input type="text" id="cfgBranch" placeholder="master">
+    </div>
+    <div class="setting-item">
+      <div>
+        <div class="si-lbl">自动同步</div>
+        <div class="si-desc">保存数据时自动上传云端</div>
+      </div>
+      <div class="switch" id="cfgAutoSync" onclick="document.getElementById('cfgAutoSync').classList.toggle('on')"></div>
+    </div>
+    <div class="btn-row" style="margin:14px 0">
+      <button class="btn btn-success btn-sm" onclick="cloudSync('download')">⬇️ 从云端拉取</button>
+      <button class="btn btn-primary btn-sm" onclick="cloudSync('upload')">⬆️ 上传到云端</button>
+    </div>
+    <div id="cloudTestResult" style="font-size:12px;color:var(--text-light);min-height:18px;margin-bottom:8px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeCloudConfig()">取消</button>
+      <button class="btn btn-primary" onclick="saveCloudConfig()">保存配置</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== 存储层 ===================== */
+const DB = {
+  get(key, def){ try{ const v = localStorage.getItem('wr_'+key); return v?JSON.parse(v):def; }catch(e){ return def; } },
+  set(key, val){ localStorage.setItem('wr_'+key, JSON.stringify(val)); },
+  del(key){ localStorage.removeItem('wr_'+key); }
+};
+
+/* ===================== Gitee 云端同步 ===================== */
+const Cloud = {
+  // 配置存储在 localStorage，首次使用预填用户提供的令牌
+  cfg: null,
+  fileSha: null,           // 云端文件的 SHA，更新时需要
+  uploading: false,
+  uploadTimer: null,
+  lastSyncAt: null,
+
+  loadCfg(){
+    if(this.cfg) return this.cfg;
+    this.cfg = DB.get('cloudCfg', {
+      token: '1c1c9836b1ce948a228cbf14d48364a5',
+      owner: 'zhou-shuangxi2026',
+      repo: 'weekly-report-data',
+      branch: 'master',
+      userId: '',           // 使用者用户名，用于数据隔离
+      autoSync: true
+    });
+    return this.cfg;
+  },
+  saveCfg(c){ this.cfg = c; DB.set('cloudCfg', c); },
+  // 数据文件路径：data_{用户名}.json，实现多人数据隔离
+  filePath(){
+    const c = this.loadCfg();
+    const uid = (c.userId||'').trim();
+    return uid ? ('data_' + uid + '.json') : 'data.json';
+  },
+  enabled(){ const c = this.loadCfg(); return !!(c.token && c.owner && c.repo && c.userId); },
+
+  api(method, body){
+    const c = this.loadCfg();
+    const path = this.filePath();
+    const base = 'https://gitee.com/api/v5/repos/' + c.owner + '/' + c.repo + '/contents/' + encodeURIComponent(path);
+    let url = base + '?access_token=' + encodeURIComponent(c.token) + '&ref=' + encodeURIComponent(c.branch);
+    const opts = { method: method || 'GET', headers: {'Content-Type':'application/json'} };
+    if(body){
+      body.access_token = c.token;
+      body.branch = c.branch;
+      opts.body = JSON.stringify(body);
+    }
+    return fetch(url, opts).then(r => {
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  },
+
+  // 收集所有 wr_ 开头的本地数据
+  collectAll(){
+    const all = {};
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && k.indexOf('wr_')===0 && k !== 'wr_cloudCfg'){
+        try{ all[k] = JSON.parse(localStorage.getItem(k)); }catch(e){}
+      }
+    }
+    all.__updatedAt = new Date().toISOString();
+    all.__device = navigator.userAgent;
+    return all;
+  },
+
+  // 上传：先获取 SHA（文件存在则更新，不存在则创建）
+  upload(msg){
+    if(!this.enabled()){ return Promise.reject('未配置云端'); }
+    if(this.uploading){ return Promise.resolve('skip'); }
+    this.uploading = true;
+    const data = this.collectAll();
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+    const message = msg || ('更新工作记录 ' + new Date().toLocaleString('zh-CN'));
+
+    return this.api('GET').then(res => {
+      // 文件已存在，更新
+      this.fileSha = res.sha;
+      return this.api('PUT', { content, message, sha: res.sha });
+    }).catch(e => {
+      // 文件不存在（404），创建
+      return this.api('POST', { content, message });
+    }).then(res => {
+      this.fileSha = res.content && res.content.sha;
+      this.lastSyncAt = new Date();
+      this.uploading = false;
+      return 'ok';
+    }).catch(e => {
+      this.uploading = false;
+      throw e;
+    });
+  },
+
+  // 下载：获取云端文件并写入本地（合并策略：云端覆盖本地，但保留本地锁屏配置）
+  download(){
+    if(!this.enabled()){ return Promise.reject('未配置云端'); }
+    return this.api('GET').then(res => {
+      this.fileSha = res.sha;
+      if(!res.content) throw new Error('云端无数据');
+      const json = decodeURIComponent(escape(atob(res.content.replace(/\s/g,''))));
+      const data = JSON.parse(json);
+      // 保留本地锁屏配置
+      const localLock = DB.get('lockCfg', null);
+      const localCloud = DB.get('cloudCfg', null);
+      // 清空旧数据（保留 cloudCfg 和 lockCfg）
+      const keep = {};
+      if(localLock) keep['wr_lockCfg'] = JSON.stringify(localLock);
+      if(localCloud) keep['wr_cloudCfg'] = JSON.stringify(localCloud);
+      Object.keys(localStorage).filter(k => k.indexOf('wr_')===0).forEach(k => {
+        if(k !== 'wr_lockCfg' && k !== 'wr_cloudCfg') localStorage.removeItem(k);
+      });
+      // 写入云端数据
+      Object.keys(data).forEach(k => {
+        if(k === '__updatedAt' || k === '__device') return;
+        if(k === 'wr_lockCfg' && localLock) return; // 不覆盖锁屏
+        if(k === 'wr_cloudCfg' && localCloud) return; // 不覆盖配置
+        localStorage.setItem(k, JSON.stringify(data[k]));
+      });
+      this.lastSyncAt = new Date();
+      return 'ok';
+    });
+  },
+
+  // 防抖自动上传
+  scheduleUpload(msg){
+    if(!this.enabled() || !this.loadCfg().autoSync) return;
+    clearTimeout(this.uploadTimer);
+    this.uploadTimer = setTimeout(() => {
+      this.upload(msg).catch(e => console.warn('自动上传失败:', e.message));
+    }, 1500);
+  }
+};
+
+/* ===================== 全局状态 ===================== */
+let state = {
+  curDate: todayStr(),
+  histFilter: 'all',
+  curRecords: [],   // 当日工作记录数组
+  curField: false,  // 当日外勤
+  fieldPlace:'', fieldNote:'',
+  isRestDay: false, // 当日是否为休息日（周六日默认true，可手动覆盖）
+  restDayOverridden: false // 是否手动覆盖过休息日状态
+};
+let lastWeeklyRawText='';  // 周报原始文本（含红色标记，供导出使用）
+let lastMonthlyRawText=''; // 月报原始文本（含红色标记，供导出使用）
+
+function todayStr(){ const d=new Date(); return fmtDate(d); }
+function fmtDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+/* ===================== 锁屏模块 ===================== */
+let lockCfg = DB.get('lockCfg', { enabled:false, mode:'password', pwd:'', gesture:'' });
+
+function renderLockScreen(){
+  const ls = document.getElementById('lockScreen');
+  if(!lockCfg.enabled){
+    ls.style.display='none';
+    enterApp();
+    return;
+  }
+  ls.style.display='flex';
+  const pwdPanel = document.getElementById('pwdPanel');
+  const gestPanel = document.getElementById('gesturePanel');
+  const toggle = document.getElementById('lockModeToggle');
+  if(lockCfg.mode==='gesture' && lockCfg.gesture){
+    pwdPanel.style.display='none';
+    gestPanel.style.display='flex';
+    toggle.style.display='none';
+    initGesture();
+  }else{
+    pwdPanel.style.display='flex';
+    gestPanel.style.display='none';
+    toggle.style.display = lockCfg.pwd ? 'none' : 'block';
+    document.getElementById('pwdInput').focus();
+  }
+}
+
+function toggleLockMode(){
+  // 仅在未设置密码时允许切换体验，实际设置在设置面板
+  showToast('请在「设置」中配置解锁方式');
+}
+
+function unlockByPwd(){
+  const v = document.getElementById('pwdInput').value;
+  if(!lockCfg.pwd){
+    // 首次未设置密码，直接进入并提示设置
+    enterApp();
+    showToast('建议在设置中开启密码保护');
+    return;
+  }
+  if(v === lockCfg.pwd){ enterApp(); }
+  else{ showToast('密码错误'); shake(document.getElementById('pwdInput')); }
+}
+
+function enterApp(){
+  document.getElementById('lockScreen').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('bottomNav').style.display='flex';
+  initApp();
+  // 首次使用：未设置使用者用户名时，自动弹出云端配置
+  const c = Cloud.loadCfg();
+  if(!c.userId){
+    setTimeout(()=>{
+      showToast('请先设置使用者用户名');
+      openSettings();
+      setTimeout(()=>openCloudConfig(), 300);
+    }, 400);
+    return;
+  }
+  // 进入应用后自动从云端同步最新数据
+  if(Cloud.enabled()){
+    Cloud.download().then(()=>{
+      showToast('✓ 已从云端同步最新数据');
+      initApp(); // 重新加载界面
+    }).catch(e=>{
+      // 云端无数据或其他错误，静默处理（首次使用正常情况）
+      console.log('云端同步跳过:', e.message);
+    });
+  }
+}
+
+function shake(el){ el.style.animation='none'; void el.offsetWidth; el.style.animation='shake .4s'; }
+const shakeStyle=document.createElement('style');
+shakeStyle.textContent='@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}';
+document.head.appendChild(shakeStyle);
+
+/* ----- 手势解锁 ----- */
+let gestPoints=[], gestDrawing=false, gestPath=[];
+const GW=260, GCOLS=3, GSIZE=GW/GCOLS;
+function initGesture(){
+  const c=document.getElementById('gestureCanvas');
+  const ctx=c.getContext('2d');
+  gestPoints=[];
+  for(let r=0;r<3;r++)for(let col=0;col<3;col++)gestPoints.push({x:col*GSIZE+GSIZE/2,y:r*GSIZE+GSIZE/2,idx:r*3+col});
+  gestPath=[]; drawGesture(ctx);
+  document.getElementById('gestureHint').textContent='请绘制手势密码';
+  c.onpointerdown=gestDown; c.onpointermove=gestMove; c.onpointerup=gestUp;
+}
+function drawGesture(ctx,cur){
+  ctx.clearRect(0,0,GW,GW);
+  ctx.fillStyle='rgba(255,255,255,.12)';
+  gestPoints.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,16,0,7);ctx.fill();});
+  if(gestPath.length){
+    ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=4;ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.beginPath();
+    gestPath.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+    if(cur)ctx.lineTo(cur.x,cur.y);
+    ctx.stroke();
+    ctx.fillStyle='#fff';
+    gestPath.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,8,0,7);ctx.fill();});
+  }
+}
+function getPos(e){const r=e.target.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
+function hitPoint(pt){return gestPoints.find(p=>Math.hypot(p.x-pt.x,p.y-pt.y)<28 && !gestPath.includes(p));}
+function gestDown(e){e.preventDefault();gestDrawing=true;gestPath=[];gestMove(e);}
+function gestMove(e){
+  if(!gestDrawing)return;e.preventDefault();
+  const c=document.getElementById('gestureCanvas');const ctx=c.getContext('2d');
+  const pos=getPos(e);const hit=hitPoint(pos);
+  if(hit){gestPath.push(hit);}
+  drawGesture(ctx,pos);
+}
+function gestUp(e){
+  gestDrawing=false;
+  const code=gestPath.map(p=>p.idx).join(',');
+  const hint=document.getElementById('gestureHint');
+  if(!lockCfg.gesture){return;}
+  if(code===lockCfg.gesture){
+    hint.textContent='✓ 解锁成功';hint.style.color='#6ee7b7';
+    setTimeout(enterApp,300);
+  }else{
+    hint.textContent='手势不正确，请重试';hint.style.color='#fca5a5';
+    const c=document.getElementById('gestureCanvas');setTimeout(()=>{gestPath=[];drawGesture(c.getContext('2d'));},400);
+  }
+}
+
+/* ===================== 设置 ===================== */
+function openSettings(){ renderSettings(); document.getElementById('settingsModal').classList.add('show'); }
+function closeSettings(){ document.getElementById('settingsModal').classList.remove('show'); }
+function renderSettings(){
+  document.getElementById('setLockSwitch').classList.toggle('on',lockCfg.enabled);
+  document.getElementById('setLockMode').value=lockCfg.mode||'password';
+  document.getElementById('setPwdRow').style.display = lockCfg.mode==='password'?'flex':'none';
+  document.getElementById('setGestureRow').style.display = lockCfg.mode==='gesture'?'flex':'none';
+  // 云端状态
+  const st = document.getElementById('cloudSyncStatus');
+  const c = Cloud.loadCfg();
+  if(c.userId && c.token && c.owner && c.repo){
+    const t = Cloud.lastSyncAt ? ('｜上次同步 '+Cloud.lastSyncAt.toLocaleTimeString('zh-CN')) : '';
+    st.textContent = '用户：'+c.userId+'｜已连接 '+c.owner+'/'+c.repo + t;
+    st.style.color = 'var(--success)';
+  }else if(c.token && c.owner && c.repo){
+    st.textContent = '未设置使用者用户名，点击配置';
+    st.style.color = 'var(--warning)';
+  }else{
+    st.textContent = '未配置，点击配置开启手机电脑同步';
+    st.style.color = 'var(--text-light)';
+  }
+}
+
+/* ----- 云端同步 ----- */
+function openCloudConfig(){
+  const c = Cloud.loadCfg();
+  document.getElementById('cfgUserId').value = c.userId||'';
+  document.getElementById('cfgOwner').value = c.owner||'';
+  document.getElementById('cfgRepo').value = c.repo||'';
+  document.getElementById('cfgToken').value = c.token||'';
+  document.getElementById('cfgBranch').value = c.branch||'master';
+  document.getElementById('cfgAutoSync').classList.toggle('on', c.autoSync!==false);
+  document.getElementById('cloudTestResult').textContent='';
+  document.getElementById('cloudModal').classList.add('show');
+}
+function closeCloudConfig(){ document.getElementById('cloudModal').classList.remove('show'); }
+function saveCloudConfig(){
+  const c = {
+    userId: document.getElementById('cfgUserId').value.trim(),
+    owner: document.getElementById('cfgOwner').value.trim(),
+    repo: document.getElementById('cfgRepo').value.trim(),
+    token: document.getElementById('cfgToken').value.trim(),
+    branch: document.getElementById('cfgBranch').value.trim()||'master',
+    autoSync: document.getElementById('cfgAutoSync').classList.contains('on')
+  };
+  if(!c.userId){ showToast('请填写使用者用户名'); return; }
+  if(!c.owner||!c.repo||!c.token){ showToast('请填写完整 Gitee 配置'); return; }
+  Cloud.saveCfg(c);
+  closeCloudConfig();
+  renderSettings();
+  showToast('✓ 云端配置已保存');
+}
+function cloudSync(action){
+  const r = document.getElementById('cloudTestResult');
+  r.style.color='var(--text-light)';
+  r.textContent = action==='download'?'⏳ 正在从云端拉取...':'⏳ 正在上传到云端...';
+  if(action==='download'){
+    Cloud.download().then(()=>{
+      r.style.color='var(--success)';
+      r.textContent='✓ 拉取成功，即将刷新页面';
+      showToast('✓ 云端数据已同步');
+      setTimeout(()=>location.reload(),1000);
+    }).catch(e=>{
+      r.style.color='var(--danger)';
+      r.textContent='✗ 拉取失败：'+e.message;
+    });
+  }else{
+    Cloud.upload().then(res=>{
+      if(res==='skip'){ r.style.color='var(--warning)'; r.textContent='⏸ 上传进行中，请稍候'; return; }
+      r.style.color='var(--success)';
+      r.textContent='✓ 上传成功 '+new Date().toLocaleTimeString('zh-CN');
+      renderSettings();
+    }).catch(e=>{
+      r.style.color='var(--danger)';
+      r.textContent='✗ 上传失败：'+e.message;
+    });
+  }
+}
+function toggleLockEnabled(){
+  if(!lockCfg.enabled){
+    // 开启锁屏：密码方式需先设置密码，设置失败则不开启
+    if(lockCfg.mode==='password' && !lockCfg.pwd){
+      const ok=resetPassword();
+      if(!ok){ showToast('未设置密码，锁屏未开启'); renderSettings(); return; }
+    }else if(lockCfg.mode==='gesture' && !lockCfg.gesture){
+      lockCfg.enabled=true; DB.set('lockCfg',lockCfg);
+      resetGesture(); renderSettings(); return;
+    }
+    lockCfg.enabled=true; DB.set('lockCfg',lockCfg); showToast('已开启锁屏');
+  }else{
+    lockCfg.enabled=false; DB.set('lockCfg',lockCfg); showToast('已关闭锁屏');
+  }
+  renderSettings();
+}
+function changeLockMode(){
+  const newMode=document.getElementById('setLockMode').value;
+  if(newMode===lockCfg.mode){return;}
+  if(newMode==='password' && !lockCfg.pwd){
+    const ok=resetPassword();
+    if(!ok){ document.getElementById('setLockMode').value=lockCfg.mode||'password'; return; }
+  }else if(newMode==='gesture' && !lockCfg.gesture){
+    lockCfg.mode=newMode; DB.set('lockCfg',lockCfg);
+    resetGesture(); renderSettings(); return;
+  }else{
+    lockCfg.mode=newMode; DB.set('lockCfg',lockCfg);
+  }
+  renderSettings();
+}
+function resetPassword(){
+  const p=prompt('请输入新密码（数字或字母）：');
+  if(p===null)return false;
+  if(p.length<1){showToast('密码不能为空');return false;}
+  const p2=prompt('请再次输入确认：');
+  if(p!==p2){showToast('两次输入不一致');return false;}
+  lockCfg.pwd=p;lockCfg.mode='password';DB.set('lockCfg',lockCfg);
+  showToast('密码已设置');renderSettings();
+  return true;
+}
+function resetGesture(){
+  closeSettings();
+  const ls=document.getElementById('lockScreen');
+  ls.style.display='flex';
+  document.getElementById('pwdPanel').style.display='none';
+  const gp=document.getElementById('gesturePanel');
+  gp.style.display='flex';
+  document.getElementById('lockModeToggle').style.display='none';
+  setupNewGesture();
+}
+function setupNewGesture(){
+  initGesture();
+  const hint=document.getElementById('gestureHint');
+  hint.textContent='请绘制新手势密码（至少4个点）';
+  hint.style.color='#fff';
+  const c=document.getElementById('gestureCanvas');
+  c.onpointerup=function(e){
+    gestUp_draw(e);
+  };
+}
+function gestUp_draw(e){
+  gestDrawing=false;
+  const code=gestPath.map(p=>p.idx).join(',');
+  const hint=document.getElementById('gestureHint');
+  if(gestPath.length<4){
+    hint.textContent='至少连接4个点，请重试';hint.style.color='#fca5a5';
+    setTimeout(()=>{gestPath=[];drawGesture(document.getElementById('gestureCanvas').getContext('2d'));},500);
+    return;
+  }
+  // 保存
+  lockCfg.gesture=code;lockCfg.mode='gesture';DB.set('lockCfg',lockCfg);
+  hint.textContent='✓ 手势已设置，请再次绘制确认';
+  hint.style.color='#6ee7b7';
+  const c=document.getElementById('gestureCanvas');
+  c.onpointerup=function(ev){ gestUp_confirm(ev); };
+  setTimeout(()=>{gestPath=[];drawGesture(c.getContext('2d'));},600);
+}
+function gestUp_confirm(e){
+  gestDrawing=false;
+  const code=gestPath.map(p=>p.idx).join(',');
+  const hint=document.getElementById('gestureHint');
+  if(code===lockCfg.gesture){
+    hint.textContent='✓ 设置成功！';
+    setTimeout(()=>{ renderLockScreen(); renderSettings(); },500);
+  }else{
+    hint.textContent='两次不一致，请重新设置';
+    hint.style.color='#fca5a5';
+    lockCfg.gesture='';
+    DB.set('lockCfg',lockCfg);
+    setTimeout(()=>setupNewGesture(),700);
+  }
+}
+
+/* ===================== 初始化应用 ===================== */
+function initApp(){
+  // 检查岗位信息
+  const pf=DB.get('profile',null);
+  document.getElementById('positionHintCard').style.display = pf&&pf.name ? 'none':'block';
+  if(pf){ fillProfileForm(pf); }
+  document.getElementById('dailyDate').value=state.curDate;
+  loadDaily();
+}
+
+/* ===================== 视图切换 ===================== */
+function switchView(v){
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.view===v));
+  const titles={daily:'每日记录',profile:'岗位信息',history:'历史记录',weekly:'周报',monthly:'月报'};
+  document.getElementById('viewTitle').textContent=titles[v]||'工作周报';
+  if(v==='history')renderHistory();
+  if(v==='weekly')renderWeekly();
+  if(v==='monthly')renderMonthly();
+  window.scrollTo(0,0);
+}
+
+/* ===================== 岗位信息 ===================== */
+function fillProfileForm(pf){
+  document.getElementById('pfCompany').value=pf.company||'';
+  document.getElementById('pfName').value=pf.name||'';
+  document.getElementById('pfDept').value=pf.dept||'';
+  document.getElementById('pfPosition').value=pf.position||'';
+  document.getElementById('pfEmpNo').value=pf.empNo||'';
+  document.getElementById('pfPhone').value=pf.phone||'';
+  document.getElementById('pfNote').value=pf.note||'';
+}
+function saveProfile(){
+  const pf={
+    company:val('pfCompany'),name:val('pfName'),dept:val('pfDept'),position:val('pfPosition'),
+    empNo:val('pfEmpNo'),phone:val('pfPhone'),note:val('pfNote')
+  };
+  if(!pf.name){showToast('请填写姓名');return;}
+  DB.set('profile',pf);
+  document.getElementById('positionHintCard').style.display='none';
+  Cloud.scheduleUpload('保存岗位信息');
+  showToast('岗位信息已保存');
+}
+function val(id){return document.getElementById(id).value.trim();}
+
+/* ===================== 每日记录 ===================== */
+function isWeekend(dateStr){
+  const d=new Date(dateStr);const w=d.getDay();
+  return w===0||w===6; // 0=周日, 6=周六
+}
+function loadDaily(){
+  state.curDate=document.getElementById('dailyDate').value;
+  const data=DB.get('daily_'+state.curDate,null);
+  const weekend=isWeekend(state.curDate);
+  if(data){
+    state.curRecords=(data.records||[]).map(r=>ensureTaskStatus(Object.assign({isImportant:false,planDays:1,taskId:'',linkedTaskId:''},r)));
+    state.curField=!!data.field;
+    state.fieldPlace=data.fieldPlace||'';
+    state.fieldNote=data.fieldNote||'';
+    // 休息日状态：已保存的数据优先；若未明确标记则周六日默认休息
+    if(data.isRestDay!==undefined){
+      state.isRestDay=!!data.isRestDay;
+      state.restDayOverridden=true;
+    }else{
+      // 旧数据：若周末且有实际工作内容，则不视为休息日
+      const hasContent=state.curRecords.some(r=>r.plan||r.progress||r.result);
+      state.isRestDay=weekend&&!hasContent&&!state.curField;
+      state.restDayOverridden=false;
+    }
+  }else{
+    state.curRecords=[ensureTaskStatus({plan:'',progress:'',result:'',isImportant:false,planDays:1,taskId:'',linkedTaskId:''})];
+    state.curField=false;state.fieldPlace='';state.fieldNote='';
+    // 新日期：周六日默认为休息日
+    state.isRestDay=weekend;
+    state.restDayOverridden=false;
+  }
+  // 确保每条记录有 taskId
+  state.curRecords.forEach(r=>{ if(!r.taskId) r.taskId='T'+Date.now()+'_'+Math.random().toString(36).substr(2,6); });
+  // 每日记录/每日计划标题切换：今日及以前=每日记录；未来=每日计划
+  const vtEl=document.getElementById('viewTitle');
+  if(state.curDate>todayStr()){ vtEl.textContent='每日计划'; saveBtn.textContent='💾 保存今日计划'; }
+  else { vtEl.textContent='每日记录'; saveBtn.textContent='💾 保存今日记录'; }
+  renderRestDayBanner();
+  renderFieldSwitch();
+  renderRecords();
+}
+/* 兼容旧数据：推断 taskStatus 字段（daily/start/continue/end） */
+function ensureTaskStatus(r){
+  if(r.taskStatus) return r; // 已有字段，跳过
+  const isDone=!!(r.progress&&(r.progress.includes('100')||/已完成/.test(r.progress)));
+  if(r.linkedTaskId){
+    r.taskStatus = isDone ? 'end' : 'continue';
+  }else{
+    r.taskStatus = (r.planDays&&r.planDays>1) ? 'start' : 'daily';
+  }
+  return r;
+}
+function renderRestDayBanner(){
+  const banner=document.getElementById('restDayBanner');
+  const txt=document.getElementById('restDayText');
+  const toggle=document.getElementById('restToggle');
+  const weekend=isWeekend(state.curDate);
+  if(state.isRestDay){
+    banner.style.display='flex';
+    txt.textContent=weekend?('今日为周末（'+weekdayCN(state.curDate)+'），默认休息日。如有工作可点击右侧按钮记录。'):'今日已标记为休息日。';
+    toggle.textContent='有工作要记录';
+    toggle.classList.remove('on');
+  }else{
+    if(weekend){
+      // 周末但用户标记为有工作
+      banner.style.display='flex';
+      txt.textContent='今日为周末（'+weekdayCN(state.curDate)+'），已切换为工作记录模式。';
+      toggle.textContent='恢复为休息日';
+      toggle.classList.add('on');
+    }else{
+      banner.style.display='none';
+    }
+  }
+}
+function toggleRestDay(){
+  state.isRestDay=!state.isRestDay;
+  state.restDayOverridden=true;
+  renderRestDayBanner();
+  renderRecords();
+}
+function renderFieldSwitch(){
+  const sw=document.getElementById('fieldSwitch');
+  sw.classList.toggle('on',state.curField);
+  document.getElementById('fieldDetail').style.display=state.curField?'block':'none';
+  document.getElementById('fieldPlace').value=state.fieldPlace;
+  document.getElementById('fieldNote').value=state.fieldNote;
+}
+function toggleField(){ state.curField=!state.curField; renderFieldSwitch(); }
+function renderRecords(){
+  const list=document.getElementById('recordList');
+  list.innerHTML='';
+  if(state.curRecords.length===0)state.curRecords.push(ensureTaskStatus({plan:'',progress:'',result:'',isImportant:false,planDays:1,taskId:'',linkedTaskId:''}));
+  const undoneTasks=getRecentUndoneTasks(14,state.curDate);
+  state.curRecords.forEach((r,i)=>{
+    if(!r.taskId)r.taskId='T'+Date.now()+'_'+i+'_'+Math.random().toString(36).substr(2,6);
+    ensureTaskStatus(r); // 确保 taskStatus 字段存在
+    const div=document.createElement('div');
+    div.className='record-item'+(r.isImportant?' is-important':'');
+    const important=r.isImportant;
+    const planDays=r.planDays||1;
+    const status=r.taskStatus||'daily';
+    // 状态对应文案与配色
+    const statusMap={
+      'daily':   {label:'当日任务',          style:'background:#e0e7ff;color:#3730a3'},
+      'start':   {label:'持续任务[开始]',    style:'background:#dbeafe;color:#1e40af'},
+      'continue':{label:'持续任务[...]',     style:'background:#fef3c7;color:#92400e'},
+      'end':     {label:'持续任务[结束]',    style:'background:#d1fae5;color:#065f46'}
+    };
+    const st=statusMap[status]||statusMap.daily;
+    // 关联任务详细信息（仅 continue/end 状态显示）
+    let linkInfoHTML='';
+    if(status==='continue'||status==='end'){
+      const linked=undoneTasks.find(t=>t.taskId===r.linkedTaskId);
+      if(r.linkedTaskId&&linked){
+        const span=Math.round((new Date(state.curDate)-new Date(linked.date))/86400000);
+        linkInfoHTML=`<div class="ri-link-info"><span class="chain-tag">🔗 ${st.label}</span> 续做自 ${esc(linked.date)} 起的「${esc((linked.plan||'').substring(0,30))}」${span>0?'（已延续 '+span+' 天）':''}</div>`;
+      }else if(r.linkedTaskId){
+        linkInfoHTML=`<div class="ri-link-info" style="color:#b91c1c;background:#fee2e2;border-color:#fecaca"><span class="chain-tag">⚠</span> 前序任务未找到，请重新选择关联</div>`;
+      }else{
+        linkInfoHTML=`<div class="ri-link-info" style="color:#b45309;background:#fffbeb;border-color:#fde68a"><span class="chain-tag">!</span> 当前为「${st.label}」状态，请在下方选择前序持续任务</div>`;
+      }
+    }
+    // 关联任务下拉框选项（仅 continue/end 状态显示）
+    const showLinkSel=(status==='continue'||status==='end');
+    let linkSelHTML='';
+    if(showLinkSel){
+      linkSelHTML='<option value="">— 请选择前序任务 —</option>';
+      if(undoneTasks.length===0){
+        linkSelHTML+='<option value="" disabled>（暂无可关联的前序持续任务）</option>';
+      }else{
+        undoneTasks.forEach(t=>{
+          const span=Math.round((new Date(state.curDate)-new Date(t.date))/86400000);
+          const impTag=t.isImportant?'★':'';
+          const doneTag=t.isDone?'✓':'';
+          linkSelHTML+=`<option value="${t.taskId}" ${r.linkedTaskId===t.taskId?'selected':''}>${doneTag}${t.date}（${span}天前）${impTag}${(t.plan||'').substring(0,20)}</option>`;
+        });
+      }
+    }
+    div.innerHTML=`
+      <div class="ri-head">
+        <div class="ri-head-left">
+          <span class="ri-num">工作记录 ${i+1}</span>
+          <span class="ri-tasktype" style="${st.style}">${st.label}</span>
+          <span class="ri-important-toggle ${important?'on':''}" onclick="toggleImportant(${i})">
+            <span class="star">${important?'★':'☆'}</span>${important?'重要任务':'标记为重要'}
+          </span>
+        </div>
+        ${state.curRecords.length>1?`<button class="ri-del" onclick="delRecord(${i})">✕</button>`:''}
+      </div>
+      ${linkInfoHTML}
+      <div class="ri-meta-row">
+        <div class="field field-mini ri-plan-days"><label>计划天数</label>
+          <input type="number" min="1" max="30" value="${planDays}" onchange="updRecord(${i},'planDays',parseInt(this.value)||1)"></div>
+        <div class="field field-mini ri-status-sel"><label>任务状态（手动选择）</label>
+          <select onchange="changeTaskStatus(${i},this.value)">
+            <option value="daily"    ${status==='daily'?'selected':''}>当日任务</option>
+            <option value="start"    ${status==='start'?'selected':''}>持续任务[开始]</option>
+            <option value="continue" ${status==='continue'?'selected':''}>持续任务[...]</option>
+            <option value="end"      ${status==='end'?'selected':''}>持续任务[结束]</option>
+          </select></div>
+        ${showLinkSel?`<div class="field field-mini ri-link-sel"><label>关联前序持续任务</label>
+          <select onchange="updRecord(${i},'linkedTaskId',this.value)">${linkSelHTML}</select></div>`:''}
+      </div>
+      <div class="field field-mini"><label>工作计划/内容</label>
+        <input type="text" value="${esc(r.plan)}" placeholder="今日要做的工作" oninput="updRecord(${i},'plan',this.value)"></div>
+      <div class="field field-mini"><label>完成进度</label>
+        <input type="text" value="${esc(r.progress)}" placeholder="如：已完成80%、100%已完成" oninput="updRecord(${i},'progress',this.value)"></div>
+      <div class="field field-mini" style="margin-bottom:0"><label>工作成果/备注</label>
+        <textarea placeholder="完成情况、遇到的问题等" oninput="updRecord(${i},'result',this.value)">${esc(r.result)}</textarea></div>
+    `;
+    list.appendChild(div);
+  });
+}
+/* 获取近期任务列表（供用户手动选择关联） */
+function getRecentUndoneTasks(days,beforeDate){
+  const result=[];
+  const DB_PREFIX='wr_'; // 与 DB.get/DB.set 中的 'wr_' 前缀保持一致
+  const keys=Object.keys(localStorage).filter(k=>k.startsWith(DB_PREFIX+'daily_'));
+  keys.sort().reverse();
+  for(const key of keys){
+    const dateStr=key.replace(DB_PREFIX+'daily_','');
+    if(dateStr>=beforeDate)continue; // 仅取当日之前的
+    const diff=Math.round((new Date(beforeDate)-new Date(dateStr))/86400000);
+    if(diff>days)break;
+    const data=DB.get('daily_'+dateStr,null);
+    if(!data||data.isRestDay)continue;
+    (data.records||[]).forEach((r,idx)=>{
+      if(!r.plan)return;
+      // 确保有 taskId（旧数据可能没有）
+      const tid=r.taskId||('T_'+dateStr+'_'+idx);
+      const done=isRecordDone(r);
+      result.push({
+        date:dateStr,plan:r.plan,progress:r.progress,
+        taskId:tid,isImportant:!!r.isImportant,isDone:done,
+        taskStatus:r.taskStatus||''
+      });
+    });
+  }
+  // 未完成的排前面，最多30条
+  result.sort((a,b)=>(a.isDone?1:0)-(b.isDone?1:0)||b.date.localeCompare(a.date));
+  return result.slice(0,30);
+}
+function toggleImportant(i){
+  if(state.curRecords[i]){
+    state.curRecords[i].isImportant=!state.curRecords[i].isImportant;
+    renderRecords();
+  }
+}
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+/* 格式化报告文本：先转义再替换红色标记为HTML span */
+function formatReportHTML(text){
+  let lines=esc(text).split('\n');
+  let html='';
+  for(const line of lines){
+    if(line===''){html+='<div style="height:0.6em"></div>';continue}
+    let l=line;
+    let wrap='';
+    if(l.startsWith('§T§')){
+      l=l.slice(3);
+      wrap='<div style="text-align:center;font-size:20px;font-weight:bold;color:#1F4E79;margin-bottom:6px">';
+    }else if(l.startsWith('§INFO§')){
+      l=l.slice(6);
+      const pairs=l.split('|');
+      let rows='';
+      for(let i=0;i<pairs.length;i+=2){
+        rows+=`<tr><td style="background:#1F4E79;color:#fff;font-weight:bold;padding:3px 10px;text-align:center;font-size:13px">${pairs[i]||''}</td><td style="color:#222;padding:3px 10px;text-align:center;font-size:13px">${pairs[i+1]||''}</td></tr>`;
+      }
+      html+=`<table style="border-collapse:collapse;width:100%;margin:4px 0 8px 0">${rows}</table>`;
+      continue;
+    }else if(l.startsWith('§H§')){
+      l=l.slice(3);
+      wrap='<div style="font-size:16px;font-weight:bold;color:#1F4E79;margin:12px 0 6px 0">';
+    }else if(l.startsWith('§D§')){
+      l=l.slice(3);
+      wrap='<div style="font-size:14px;font-weight:bold;color:#2E75B6;margin:8px 0 3px 0">';
+    }else if(l.startsWith('§K§')){
+      l=l.slice(3);
+      wrap='<div style="font-size:14px;font-weight:bold;color:#222;margin:3px 0 1px 0;padding-left:12px">';
+    }else if(l.startsWith('§P§')){
+      l=l.slice(3);
+      wrap='<div style="font-size:13px;color:#222;padding-left:30px;margin-bottom:1px">';
+    }else if(l.startsWith('§R§')){
+      l=l.slice(3);
+      wrap='<div style="font-size:13px;color:#222;padding-left:30px;margin-bottom:1px">';
+    }else if(l.startsWith('§S§')){
+      l=l.slice(3);
+      wrap='<div style="font-size:14px;color:#222;padding-left:6px;margin-bottom:3px;line-height:1.6">';
+    }else if(l.startsWith('§C§')){
+      l=l.slice(3);
+      wrap='<div style="font-size:14px;color:#222;padding-left:12px">';
+    }else{
+      wrap='<div style="font-size:13px;color:#222">';
+    }
+    l=l
+      .replace(/§BL§/g,'<span style="color:#2E75B6;font-weight:bold">')
+      .replace(/§EBL§/g,'</span>')
+      .replace(/§GY§/g,'<span style="font-size:11px;color:#595959;font-weight:normal">')
+      .replace(/§EGY§/g,'</span>')
+      .replace(/§RED§/g,'<span style="color:red;font-weight:600">')
+      .replace(/§END§/g,'</span>')
+      .replace(/§B§/g,'<span style="font-weight:bold">')
+      .replace(/§EB§/g,'</span>');
+    html+=wrap+l+'</div>';
+  }
+  return html;
+}
+function updRecord(i,k,v){ if(state.curRecords[i])state.curRecords[i][k]=v; }
+function addRecord(){ state.curRecords.push(ensureTaskStatus({plan:'',progress:'',result:'',isImportant:false,planDays:1,taskId:'',linkedTaskId:''})); renderRecords(); }
+function delRecord(i){ state.curRecords.splice(i,1); renderRecords(); }
+/* 手动切换任务状态：daily/start 清空关联；continue/end 保留关联由用户选 */
+function changeTaskStatus(i,newStatus){
+  const r=state.curRecords[i];
+  if(!r)return;
+  r.taskStatus=newStatus;
+  if(newStatus==='daily'||newStatus==='start'){
+    r.linkedTaskId=''; // 切回独立任务，清空关联
+  }
+  renderRecords();
+}
+
+function saveDaily(){
+  // 过滤空记录
+  const records=state.curRecords.filter(r=>r.plan||r.progress||r.result);
+  if(records.length===0 && !state.curField && !state.isRestDay){ showToast('请先填写工作内容'); return; }
+  const data={
+    date:state.curDate,
+    records:records.length?records:[{plan:'',progress:'',result:'',isImportant:false}],
+    field:state.curField,
+    fieldPlace:state.fieldPlace=document.getElementById('fieldPlace').value,
+    fieldNote:state.fieldNote=document.getElementById('fieldNote').value,
+    isRestDay:state.isRestDay,
+    savedAt:new Date().toISOString()
+  };
+  DB.set('daily_'+state.curDate,data);
+  updateIndex(state.curDate);
+  Cloud.scheduleUpload('保存 '+state.curDate+' 记录');
+  showToast('✓ 已保存 '+state.curDate);
+}
+function updateIndex(date){
+  let idx=DB.get('dateIndex',[]);
+  if(!idx.includes(date)){idx.push(date);idx.sort();DB.set('dateIndex',idx);}
+}
+function shiftDate(n){
+  const d=new Date(state.curDate);d.setDate(d.getDate()+n);
+  document.getElementById('dailyDate').value=fmtDate(d);
+  loadDaily();
+}
+
+/* ===================== 历史记录 ===================== */
+function getAllRecords(){
+  const idx=DB.get('dateIndex',[]);
+  return idx.map(d=>DB.get('daily_'+d,null)).filter(Boolean);
+}
+function setHistFilter(f){ state.histFilter=f; renderHistory(); }
+function renderHistory(){
+  let list=getAllRecords().reverse();
+  if(state.histFilter==='field')list=list.filter(r=>r.field);
+  if(state.histFilter==='week'){
+    const now=new Date();const day=now.getDay()||7;
+    const mon=new Date(now);mon.setDate(now.getDate()-day+1);mon.setHours(0,0,0,0);
+    list=list.filter(r=>new Date(r.date)>=mon);
+  }
+  const wrap=document.getElementById('historyList');
+  if(list.length===0){
+    wrap.innerHTML=`<div class="empty"><span class="emoji">📭</span>暂无记录</div>`;return;
+  }
+  wrap.innerHTML=list.map(r=>{
+    const isRest=r.isRestDay===true;
+    const cnt=(r.records||[]).filter(x=>x.plan||x.progress||x.result).length;
+    const impCnt=(r.records||[]).filter(x=>x.isImportant).length;
+    const preview=(r.records||[]).filter(x=>x.plan).map(x=>(x.isImportant?'★ ':'• ')+x.plan).join('\n');
+    return `<div class="history-item" onclick="viewHistDetail('${r.date}')">
+      <div class="hi-head">
+        <div class="hi-date">${r.date} ${weekdayCN(r.date)}</div>
+        <div class="hi-badges">
+          ${isRest?'<span class="badge" style="background:#fef3c7;color:#92400e">休息</span>':''}
+          ${r.field?'<span class="badge badge-field">外勤</span>':''}
+          ${impCnt?'<span class="badge" style="background:#fef3c7;color:#b45309">★'+impCnt+'</span>':''}
+          <span class="badge badge-count">${cnt}条</span>
+        </div>
+      </div>
+      <div class="hi-preview">${isRest&&!preview?'（休息日）':(esc(preview)||'（无工作计划）')}</div>
+    </div>`;
+  }).join('');
+}
+function weekdayCN(dateStr){
+  const w=['日','一','二','三','四','五','六'][new Date(dateStr).getDay()];
+  return '周'+w;
+}
+function viewHistDetail(date){
+  document.getElementById('dailyDate').value=date;
+  switchView('daily');
+  loadDaily();
+}
+
+/* ===================== 周报 ===================== */
+function getWeekRange(dateStr){
+  const d=new Date(dateStr);const day=d.getDay()||7;
+  const mon=new Date(d);mon.setDate(d.getDate()-day+1);
+  const sun=new Date(mon);sun.setDate(mon.getDate()+6);
+  return {start:fmtDate(mon),end:fmtDate(sun),mon,sun};
+}
+function renderWeekly(){
+  const wp=document.getElementById('weekPicker');
+  if(!wp.value){
+    const r=getWeekRange(todayStr());
+    wp.value=r.start.slice(0,4)+'-W'+getWeekNum(r.mon);
+  }
+  const wk=wp.value; // YYYY-Www
+  const [y,w]=wk.split('-W');
+  const mon=mondayOfISOWeek(parseInt(y),parseInt(w));
+  const start=fmtDate(mon);const end=fmtDate(new Date(mon.getTime()+6*86400000));
+  const all=getAllRecords();
+  const weekData=all.filter(r=>r.date>=start&&r.date<=end).sort((a,b)=>a.date.localeCompare(b.date));
+  document.getElementById('weeklyContent').innerHTML=buildWeeklyHTML(start,end,weekData);
+}
+function getWeekNum(d){
+  const t=new Date(d);t.setHours(0,0,0,0);
+  t.setDate(t.getDate()+4-(t.getDay()||7));
+  const yearStart=new Date(t.getFullYear(),0,1);
+  return Math.ceil(((t-yearStart)/86400000+1)/7);
+}
+function mondayOfISOWeek(y,w){
+  const simple=new Date(y,0,1+(w-1)*7);
+  const dow=simple.getDay();const off=(dow<=4)?dow-1:dow-8;
+  simple.setDate(simple.getDate()-off);
+  simple.setHours(0,0,0,0);
+  return simple;
+}
+function shiftWeek(n){
+  const wp=document.getElementById('weekPicker');
+  const [y,w]=wp.value.split('-W');
+  let nw=parseInt(w)+n,ny=parseInt(y);
+  if(nw<1){ny--;nw=52;}
+  if(nw>52){ny++;nw=1;}
+  wp.value=ny+'-W'+String(nw).padStart(2,'0');
+  renderWeekly();
+}
+function buildWeeklyHTML(start,end,data){
+  const pf=DB.get('profile',{});
+  const totalDays=data.length;
+  const fieldDays=data.filter(r=>r.field).length;
+  const restDays=data.filter(r=>r.isRestDay===true).length;
+  const workDays=data.filter(r=>r.isRestDay!==true).length;
+  let totalRecords=0;
+  let importantRecords=0;
+  const dayBars={};
+  data.forEach(r=>{
+    const recs=(r.records||[]).filter(x=>x.plan||x.progress||x.result);
+    const c=recs.length;
+    totalRecords+=c;dayBars[r.date]=c;
+    importantRecords+=recs.filter(x=>x.isImportant).length;
+  });
+  const maxBar=Math.max(1,...Object.values(dayBars));
+  // 任务链分析（基于任务链判定完成率）
+  const chains=buildTaskChains(data);
+  const crossDayTasks=extractCrossDayTasks(chains);
+  const chainCompleteRate=calcChainCompleteRate(chains);
+  const chainDoneCount=chains.filter(c=>c.isDone).length;
+  const chainUndoneCount=chains.length-chainDoneCount;
+  const fieldNotes=data.filter(r=>r.field&&r.fieldNote).map(r=>r.date+'：'+r.fieldPlace+' - '+r.fieldNote);
+  const weekKey=start.slice(0,4)+'-W'+getWeekNum(new Date(start));
+  const savedPlan=DB.get('plan_week_'+weekKey,'');
+  const allPlans=data.flatMap(r=>(r.records||[]).map(x=>x.plan).filter(Boolean));
+
+  let html=`
+  <div class="card">
+    <div class="card-title"><span class="emoji">📊</span>周报概览</div>
+    <div style="font-size:13px;color:var(--text-light);margin-bottom:10px">${start} ~ ${end}</div>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="num">${totalDays}</div><div class="lbl">记录天数</div></div>
+      <div class="stat-box"><div class="num">${totalRecords}</div><div class="lbl">工作条数</div></div>
+      <div class="stat-box"><div class="num" style="color:#b45309">${importantRecords}</div><div class="lbl">重要任务</div></div>
+      <div class="stat-box"><div class="num">${chainCompleteRate}%</div><div class="lbl">完成率</div></div>
+    </div>
+    <h3>每日工作量</h3>
+    <div class="bar-chart">
+    ${data.map(r=>{
+      const isRest=r.isRestDay===true;
+      const dayLbl=r.date.slice(5)+' '+weekdayCN(r.date).slice(1)+(isRest?' 休':'');
+      return `
+      <div class="bar-row">
+        <span class="bar-lbl" style="${isRest?'color:#f59e0b':''}">${dayLbl}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${(dayBars[r.date]/maxBar*100)}%;${isRest?'background:#fbbf24':''}"></div></div>
+        <span class="bar-val">${dayBars[r.date]||0}</span>
+      </div>`;
+    }).join('')||'<div style="font-size:13px;color:var(--text-light)">本周暂无记录</div>'}
+    </div>
+  </div>`;
+
+  // 周报正文
+  const companyPrefix=pf.company?pf.company+' · ':'';
+  let text=`§T§${companyPrefix}工作周报\n\n`;
+  text+=`§INFO§姓名|${pf.name||'-'}|部门|${pf.dept||'-'}|岗位|${pf.position||'-'}|周期|${start} 至 ${end}\n\n`;
+  text+=`§H§一、本周工作概况\n`;
+  text+=`§S§本周共记录 ${totalDays} 天（其中工作日 ${workDays} 天，休息日 ${restDays} 天），完成工作事项 ${totalRecords} 项（含重要任务 ${importantRecords} 项）。\n`;
+  text+=`§S§按任务链统计：本周共有 ${chains.length} 项任务，其中 ${chainDoneCount} 项已在本周内完成，${chainUndoneCount} 项进行中/未完成，任务完成率 ${chainCompleteRate}%。\n`;
+  if(crossDayTasks.length>0){
+    text+=`§S§其中 ${crossDayTasks.length} 项为跨天延续任务。\n`;
+  }
+  text+=`§S§外勤 ${fieldDays} 天。\n\n`;
+  text+=`§H§二、每日工作明细\n`;
+  data.forEach(r=>{
+    const isRest=r.isRestDay===true;
+    const dateStr=`【${r.date} ${weekdayCN(r.date)}】${r.field?'（外勤：'+(r.fieldPlace||'）'):''}${isRest?'（休息日）':''}`;
+    text+=`\n§D§${dateStr}\n`;
+    const recs=(r.records||[]).filter(x=>x.plan||x.progress||x.result);
+    if(recs.length===0&&isRest){
+      text+=`§C§休息日，无工作记录。\n`;
+    }else{
+      recs.forEach((x,i)=>{
+        const stMap={'daily':'','start':'[持续·开始]','continue':'[持续·中]','end':'[持续·结束]'};
+        const statusTag=stMap[x.taskStatus]||'';
+        const planTag=x.planDays&&x.planDays>1?'(计划'+x.planDays+'天)':'';
+        let tags=[];
+        if(x.isImportant)tags.push('[重要]');
+        if(statusTag)tags.push(statusTag);
+        if(planTag)tags.push(planTag);
+        const tagStr=tags.length?'§GY§  '+tags.join(' ')+'§EGY§':'';
+        text+=`§K§${i+1}. ${x.plan||'(未填写)'}${tagStr}\n`;
+        if(x.progress)text+=`§P§§BL§进度：§EBL§${x.progress}\n`;
+        if(x.result)text+=`§R§§BL§成果：§EBL§${x.result}\n`;
+      });
+    }
+    if(r.field&&r.fieldNote)text+=`§C§外勤说明：${r.fieldNote}\n`;
+  });
+  text+=`\n§H§三、本周汇总分析\n`;
+  let sumIdx=1;
+  text+=`§S§${sumIdx}. 工作量分布：${data.length?`日均 ${(totalRecords/totalDays).toFixed(1)} 项`:'无数据'}${fieldDays?`，外勤占比 ${Math.round(fieldDays/totalDays*100)}%`:''}。\n`;
+  sumIdx++;
+  text+=`§S§${sumIdx}. 完成情况（按任务链）：${chainDoneCount} 项已在本周完成，${chainUndoneCount} 项进行中/未完成。未完成任务将延续至下周。\n`;
+  sumIdx++;
+  if(crossDayTasks.length>0){
+    const overdue=crossDayTasks.filter(c=>c.isOverdue);
+    const noReason=crossDayTasks.filter(c=>!c.hasReason);
+    let line=`${sumIdx}. 跨天任务：本周共 ${crossDayTasks.length} 项跨天任务`;
+    if(overdue.length>0)line+=`，其中 ${overdue.length} 项超期`;
+    if(noReason.length>0)line+=`，${noReason.length} 项未注明延续原因`;
+    line+=`。`;
+    text+=`§S§${line}\n`;
+    sumIdx++;
+  }
+  if(importantRecords>0){
+    text+=`§S§${sumIdx}. 重点任务：本周共标记 ${importantRecords} 项重要任务，请重点关注其推进进度。\n`;
+  }
+  text+=`\n§H§四、下周计划\n`;
+  text+=(savedPlan||'（请补充下周重点工作安排）').split('\n').map(l=>`§S§${l}`).join('\n')+'\n';
+
+  lastWeeklyRawText=text;
+  html+=`
+  <div class="card">
+    <div class="card-title"><span class="emoji">📄</span>周报正文</div>
+    <div class="report-text" id="weeklyText">${formatReportHTML(text)}</div>
+  </div>`;
+
+  // 甘特图卡片
+  if(chains.length>0){
+    html+=`<div class="card">
+    <div class="card-title"><span class="emoji">📅</span>任务甘特图</div>
+    ${buildGanttHTML(chains,start,end)}
+  </div>`;
+  }
+
+  html+=`
+  <div class="card summary-card">
+    <div class="card-title"><span class="emoji">💡</span>智能分析</div>
+    <div style="font-size:13px;line-height:1.7">
+      ${generateAnalysis(totalDays,totalRecords,fieldDays,chainCompleteRate,data,crossDayTasks)}
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="emoji">📝</span>下周计划</div>
+    <div class="field" style="margin-bottom:10px">
+      <textarea id="weeklyPlanInput" placeholder="请填写下周重点工作安排，每行一项..." style="min-height:110px">${esc(savedPlan)}</textarea>
+    </div>
+    <button class="btn btn-primary" onclick="saveWeeklyPlan('${weekKey}')">💾 保存下周计划</button>
+  </div>
+  <div class="btn-row" style="margin-bottom:14px">
+    <button class="btn btn-success" onclick="exportReport('weekly','csv')">📊 导出甘特图</button>
+    <button class="btn btn-primary" onclick="exportReport('weekly','doc')">📄 导出文档</button>
+  </div>`;
+  return html;
+}
+function saveWeeklyPlan(weekKey){
+  const v=document.getElementById('weeklyPlanInput').value;
+  DB.set('plan_week_'+weekKey,v);
+  Cloud.scheduleUpload('保存下周计划');
+  showToast('✓ 下周计划已保存');
+}
+function generateAnalysis(days,records,field,rate,data,crossDayTasks){
+  let tips=[];
+  if(days===0)tips.push('本周尚未记录工作内容，建议养成每日记录习惯。');
+  else{
+    if(records/days>4)tips.push('工作量较大（日均'+(records/days).toFixed(1)+'项），注意合理分配精力。');
+    else if(records/days<1.5)tips.push('工作量偏少，可考虑承接更多任务或细化记录。');
+    else tips.push('工作量适中，节奏合理。');
+    if(rate>=80)tips.push('任务链完成率'+rate+'%（按任务最终状态统计），执行力强，继续保持。');
+    else if(rate<50)tips.push('任务链完成率仅'+rate+'%，需关注未完成任务，分析是否需要调整计划天数或拆分任务。');
+    else tips.push('任务链完成率'+rate+'%，部分任务仍在推进中。');
+    if(field>2)tips.push('外勤'+field+'天较多，注意外勤与内勤工作的平衡。');
+    if(crossDayTasks&&crossDayTasks.length>0){
+      const overdue=crossDayTasks.filter(c=>c.isOverdue);
+      const noReason=crossDayTasks.filter(c=>!c.hasReason);
+      tips.push('本周有'+crossDayTasks.length+'项跨天任务'+(overdue.length?'，其中'+overdue.length+'项超期':'')+(noReason.length?'，'+noReason.length+'项未注明延续原因':'')+'。');
+    }
+    // 找最忙的一天
+    const peak=data.reduce((a,b)=>((b.records||[]).length>(a.records||[]).length?b:a),data[0]);
+    if(peak)tips.push(peak.date+'工作量最高，可作为节奏参考。');
+  }
+  return tips.map(t=>'• '+t).join('<br>');
+}
+
+/* ===================== 月报 ===================== */
+function renderMonthly(){
+  const mp=document.getElementById('monthPicker');
+  if(!mp.value)mp.value=todayStr().slice(0,7);
+  const ym=mp.value; // YYYY-MM
+  const [y,m]=ym.split('-').map(Number);
+  const start=ym+'-01';
+  const end=ym+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0');
+  const all=getAllRecords();
+  const monthData=all.filter(r=>r.date>=start&&r.date<=end).sort((a,b)=>a.date.localeCompare(b.date));
+  document.getElementById('monthlyContent').innerHTML=buildMonthlyHTML(ym,monthData);
+}
+function shiftMonth(n){
+  const mp=document.getElementById('monthPicker');
+  let [y,m]=mp.value.split('-').map(Number);
+  m+=n;
+  if(m<1){y--;m=12;}
+  if(m>12){y++;m=1;}
+  mp.value=y+'-'+String(m).padStart(2,'0');
+  renderMonthly();
+}
+/* 工作分类：根据关键词判断工作类型 */
+function classifyWork(plan,result){
+  const txt=(plan||'')+' '+(result||'');
+  const cats=[];
+  if(/采购|投标|招标|供应商|食材|项目|竞标|报价|合同|采购项目|大宗/.test(txt))cats.push('采购投标');
+  if(/搜索|筛选|收集|整理|信息|调研|查|查找|浏览|企查查|销邦|乙方宝/.test(txt))cats.push('信息收集调研');
+  if(/文档|资料|归档|报告|总结|整理|录入|上传|编写|撰写|制作/.test(txt))cats.push('文档资料处理');
+  if(/会议|沟通|对接|讨论|汇报|确认|联系|协调|跟进|代总/.test(txt))cats.push('沟通协调汇报');
+  if(/外勤|出差|外出|考察|现场|拜访|对接/.test(txt))cats.push('外勤出差');
+  if(/AI|工具|智能|归档整理|处理|分析|系统|软件/.test(txt))cats.push('工具与技术应用');
+  if(cats.length===0)cats.push('其他工作');
+  return cats[0];
+}
+/* 生成工作分类统计 */
+function buildCategoryStats(data){
+  const stats={};
+  data.forEach(r=>{
+    (r.records||[]).forEach(x=>{
+      if(!x.plan&&!x.progress&&!x.result)return;
+      const cat=classifyWork(x.plan,x.result);
+      if(!stats[cat])stats[cat]={count:0,done:0,important:0,items:[]};
+      stats[cat].count++;
+      if(x.progress&&(x.progress.includes('完成')||x.progress.includes('100')))stats[cat].done++;
+      if(x.isImportant)stats[cat].important++;
+      stats[cat].items.push({date:r.date,plan:x.plan,progress:x.progress,result:x.result,field:r.field,isImportant:!!x.isImportant});
+    });
+  });
+  return stats;
+}
+/* 从工作内容中提取问题 */
+function extractProblems(data){
+  const problems=[];
+  data.forEach(r=>{
+    (r.records||[]).forEach(x=>{
+      const txt=((x.plan||'')+' '+(x.result||'')+' '+(x.progress||'')).trim();
+      if(/问题|困难|不足|待解决|未完成|拖延|阻塞|卡顿|不理想|没有适合|暂无|未找到|不匹配/.test(txt)){
+        problems.push({date:r.date,plan:x.plan,desc:txt,isImportant:!!x.isImportant});
+      }
+    });
+  });
+  return problems;
+}
+/* 提取重要任务（用于月报重点任务章节） */
+function extractImportantRecords(data){
+  const list=[];
+  data.forEach(r=>{
+    (r.records||[]).forEach(x=>{
+      if(x.isImportant && (x.plan||x.progress||x.result)){
+        list.push({
+          date:r.date,week:getWeekNum(new Date(r.date)),
+          plan:x.plan,progress:x.progress,result:x.result,
+          field:r.field,fieldPlace:r.fieldPlace,
+          taskId:x.taskId||'',linkedTaskId:x.linkedTaskId||'',planDays:x.planDays||1
+        });
+      }
+    });
+  });
+  return list.sort((a,b)=>a.date.localeCompare(b.date));
+}
+/* ===================== 任务链追踪与完成率判定 ===================== */
+/* 判断单条记录是否已完成 */
+function isRecordDone(r){
+  if(!r.progress)return false;
+  if(r.progress.includes('100'))return true;
+  if(r.progress.includes('完成')&&!r.progress.includes('未完成'))return true;
+  return false;
+}
+/* 构建任务链：通过 linkedTaskId 关联，将跨天记录串联成任务链 */
+function buildTaskChains(data){
+  // 1. 扁平化所有记录
+  const allItems=[];
+  data.forEach(d=>{
+    (d.records||[]).forEach((r,idx)=>{
+      if(!r.plan&&!r.progress&&!r.result)return;
+      allItems.push({
+        date:d.date,plan:r.plan,progress:r.progress,result:r.result,
+        isImportant:!!r.isImportant,planDays:r.planDays||1,
+        // 旧数据可能没有 taskId，生成与 getRecentUndoneTasks 一致的临时ID，确保链可正确关联
+        taskId:r.taskId||('T_'+d.date+'_'+idx),linkedTaskId:r.linkedTaskId||'',
+        taskStatus:r.taskStatus||'',
+        isRestDay:d.isRestDay===true
+      });
+    });
+  });
+  // 2. 建立 taskId -> item 映射
+  const taskMap={};
+  allItems.forEach(it=>{ if(it.taskId)taskMap[it.taskId]=it; });
+  // 3. 通过 linkedTaskId 构建链
+  const chains=[];
+  const visited={};
+  allItems.forEach(it=>{
+    if(visited[it.taskId])return;
+    // 向前追溯链头
+    let head=it;
+    while(head.linkedTaskId&&taskMap[head.linkedTaskId]&&!visited[taskMap[head.linkedTaskId].taskId]){
+      head=taskMap[head.linkedTaskId];
+    }
+    // 从链头向后收集整条链
+    const chain=[];
+    let cur=head;
+    while(cur&&!visited[cur.taskId]){
+      visited[cur.taskId]=true;
+      chain.push(cur);
+      // 找下一个：谁的 linkedTaskId 等于当前 taskId
+      const next=allItems.find(x=>x.linkedTaskId===cur.taskId&&!visited[x.taskId]);
+      cur=next||null;
+    }
+    if(chain.length>0){
+      const startDate=chain[0].date;
+      const endDate=chain[chain.length-1].date;
+      const spanDays=Math.round((new Date(endDate)-new Date(startDate))/86400000)+1;
+      const lastItem=chain[chain.length-1];
+      // 链尾完成判定：
+      // - 跨天链：用户手动选"持续任务[结束]"（taskStatus==='end'）即视为链完成，否则回退到进度文本
+      // - 当日任务（单日链）：仅看进度文本，无 taskStatus 判定
+      const lastDone=chain.length>1
+        ? (lastItem.taskStatus==='end'||isRecordDone(lastItem))
+        : isRecordDone(lastItem);
+      const anyDone=chain.some(isRecordDone);
+      const totalPlanDays=chain.reduce((s,c)=>s+(c.planDays||1),0);
+      // ===== 计算计划日期范围 =====
+      // 规则：从链头日期开始，按每条记录的 planDays 天数往后推，忽略"延续"本身日期，仅基于各阶段 planDays 做计划
+      function addDays(dateStr,n){
+        if(!n||n<=0)n=1;
+        const d=new Date(dateStr);
+        d.setDate(d.getDate()+n-1);
+        return d.toISOString().slice(0,10);
+      }
+      // 计算计划结束日期：链头 + 累计计划天数 - 1
+      const headDate=chain[0].date;
+      const planEndDate=addDays(headDate,totalPlanDays);
+      const planSpanDays=Math.round((new Date(planEndDate)-new Date(headDate))/86400000)+1;
+      // 确定链的任务状态类型
+      let chainStatus='daily';
+      if(chain.length>1){
+        chainStatus=lastDone?'end':'continue';
+      }else{
+        const st=chain[0].taskStatus;
+        if(st&&['daily','start','continue','end'].includes(st)){
+          chainStatus=st;
+        }else if((chain[0].planDays||1)>1){
+          chainStatus='start';
+        }else{
+          chainStatus='daily';
+        }
+      }
+      chains.push({
+        items:chain,
+        startDate:startDate,endDate:endDate,
+        planStartDate:headDate,planEndDate:planEndDate,planSpanDays:planSpanDays,
+        spanDays:spanDays,
+        planDays:totalPlanDays,
+        isDone:lastDone,
+        isOverdue:spanDays>totalPlanDays,
+        isCrossDay:chain.length>1,
+        hasReason:chainHasReason(chain),
+        mainPlan:chain[0].plan||chain[chain.length-1].plan||'',
+        isImportant:chain.some(c=>c.isImportant),
+        taskStatus:chainStatus
+      });
+    }
+  });
+  return chains;
+}
+/* 检查任务链各节点是否写明了延续原因 */
+function chainHasReason(chain){
+  if(chain.length<=1)return true; // 单日任务无需说明
+  // 检查非首日的记录是否包含原因说明关键词
+  const reasonKeywords=/因为|由于|原因|继续|延续|昨天|前天|上次|尚未|未完成|还需|接下来|接着|今日继续|推进|等待|对方|确认|协调|补充|修改|完善|调整|问题|困难|卡/;
+  for(let i=1;i<chain.length;i++){
+    const txt=((chain[i].plan||'')+' '+(chain[i].result||'')+' '+(chain[i].progress||'')).trim();
+    if(reasonKeywords.test(txt))return true;
+  }
+  return false;
+}
+/* 基于任务链重新计算完成率（周期内最终完成状态） */
+function calcChainCompleteRate(chains){
+  if(chains.length===0)return 0;
+  const doneCount=chains.filter(c=>c.isDone).length;
+  return Math.round(doneCount/chains.length*100);
+}
+/* 提取跨天延续任务（用于延续原因分析） */
+function extractCrossDayTasks(chains){
+  return chains.filter(c=>c.isCrossDay).sort((a,b)=>b.spanDays-a.spanDays);
+}
+/* 工作关联分析：识别工作主线、推进脉络与因果链 */
+function analyzeWorkLinkage(data,importantRecords){
+  // 1. 按工作分类聚类，找出贯穿全月的主线
+  const catTimeline={};
+  data.forEach(r=>{
+    (r.records||[]).forEach(x=>{
+      if(!x.plan&&!x.result)return;
+      const cat=classifyWork(x.plan,x.result);
+      if(!catTimeline[cat])catTimeline[cat]={dates:[],items:[],firstDate:r.date,lastDate:r.date};
+      catTimeline[cat].dates.push(r.date);
+      catTimeline[cat].items.push({date:r.date,plan:x.plan,result:x.result,progress:x.progress,isImportant:!!x.isImportant});
+      if(r.date<catTimeline[cat].firstDate)catTimeline[cat].firstDate=r.date;
+      if(r.date>catTimeline[cat].lastDate)catTimeline[cat].lastDate=r.date;
+    });
+  });
+  // 2. 识别"主线"：跨多天、有持续推进的工作类别
+  const mainlines=Object.keys(catTimeline).map(cat=>{
+    const t=catTimeline[cat];
+    const uniqDates=[...new Set(t.dates)];
+    return {
+      category:cat,
+      dateCount:uniqDates.length,
+      itemCount:t.items.length,
+      firstDate:t.firstDate,lastDate:t.lastDate,
+      items:t.items,
+      span:Math.round((new Date(t.lastDate)-new Date(t.firstDate))/86400000)+1
+    };
+  }).filter(m=>m.dateCount>=2||m.itemCount>=3).sort((a,b)=>b.dateCount-a.dateCount||b.itemCount-a.itemCount);
+
+  // 3. 因果链：寻找同一类别中"先调研→后行动→再交付"的推进模式
+  const causalChains=[];
+  mainlines.forEach(m=>{
+    const items=m.items.slice().sort((a,b)=>a.date.localeCompare(b.date));
+    const phases={调研:[],行动:[],交付:[]};
+    items.forEach(it=>{
+      const txt=(it.plan||'')+(it.result||'')+(it.progress||'');
+      if(/搜索|筛选|收集|整理|调研|查|查找|浏览|了解|分析/.test(txt))phases.调研.push(it);
+      else if(/完成|交付|归档|报告|总结|制作|编写|撰写|签订|中标|成交/.test(txt))phases.交付.push(it);
+      else phases.行动.push(it);
+    });
+    if(phases.调研.length&&phases.交付.length){
+      causalChains.push({
+        category:m.category,
+        research:phases.调研,
+        action:phases.行动,
+        delivery:phases.交付,
+        span:m.span
+      });
+    }
+  });
+
+  // 4. 重要任务的推进脉络
+  const importantTrace=importantRecords.map(it=>{
+    const done=it.progress&&(it.progress.includes('完成')||it.progress.includes('100'));
+    return {date:it.date,plan:it.plan,result:it.result,done,week:it.week};
+  });
+
+  return {catTimeline,mainlines,causalChains,importantTrace};
+}
+/* 生成下一步工作方向指导 */
+function generateDirectionGuidance(data,linkage,importantRecords,problems,catStats,crossDayTasks){
+  const guidance=[];
+  // 构建任务链，用于判断重要任务是否真正未完成（链尾完成即视为完成）
+  const allChains=buildTaskChains(data);
+  // 0. 基于跨天延续任务分析
+  if(crossDayTasks&&crossDayTasks.length>0){
+    const overdue=crossDayTasks.filter(c=>c.isOverdue);
+    const noReason=crossDayTasks.filter(c=>!c.hasReason);
+    const undone=crossDayTasks.filter(c=>!c.isDone);
+    if(undone.length>0){
+      guidance.push('【未结任务】以下 '+undone.length+' 项跨天任务在周期内仍未完成：');
+      undone.slice(0,3).forEach(c=>{
+        guidance.push('  · '+c.startDate+'~'+c.endDate+'（'+c.spanDays+'天）：'+(c.mainPlan||'').substring(0,35));
+      });
+      guidance.push('  建议下月优先收尾，并分析延期根因。');
+    }
+    if(overdue.length>0){
+      guidance.push('【超期警示】'+overdue.length+' 项任务实际耗时超过计划天数，建议：');
+      guidance.push('  · 评估计划天数设定是否合理，适当增加缓冲；');
+      guidance.push('  · 对频繁超期的任务类型，拆分为更小粒度便于跟踪。');
+    }
+    if(noReason.length>0){
+      guidance.push('【记录规范】'+noReason.length+' 项跨天任务未写明延续原因，建议：');
+      guidance.push('  · 续做任务时务必在"工作成果/备注"中注明为何延续（如等待对方回复、需补充资料等）；');
+      guidance.push('  · 关联前序任务时同步填写当日进展与阻塞点。');
+    }
+  }
+  // 1. 基于未完成的重要任务（按任务链判定：链尾完成即视为已完成）
+  // 直接从任务链中提取未完成的重要任务链，每条链只显示一次（避免同链多记录重复列出）
+  const undoneImportantChains=allChains.filter(c=>c.isImportant && !c.isDone);
+  if(undoneImportantChains.length>0){
+    guidance.push('【重点跟进】以下 '+undoneImportantChains.length+' 项重要任务尚未完成，下月应作为首要推进事项：');
+    undoneImportantChains.slice(0,5).forEach(c=>{
+      guidance.push('  · '+c.endDate+'：'+(c.mainPlan||'').substring(0,40)+(c.mainPlan&&c.mainPlan.length>40?'...':''));
+    });
+  }
+  // 2. 基于工作主线延续
+  if(linkage.mainlines.length>0){
+    const top=linkage.mainlines[0];
+    guidance.push('【主线延续】「'+top.category+'」类工作贯穿 '+top.firstDate+' 至 '+top.lastDate+'，累计 '+top.itemCount+' 项，是该岗位的核心职责方向，下月应持续投入并优化流程。');
+  }
+  // 3. 基于因果链建议
+  if(linkage.causalChains.length>0){
+    guidance.push('【推进脉络】识别到工作存在"调研→行动→交付"的推进链条，建议下月：');
+    guidance.push('  · 对调研类工作前置安排，为后续行动留出时间；');
+    guidance.push('  · 对交付类工作建立节点跟踪，避免临近月底集中冲刺。');
+  }
+  // 4. 基于问题建议
+  if(problems.length>0){
+    guidance.push('【问题改进】本月识别到 '+problems.length+' 项待改进事项，建议下月：');
+    guidance.push('  · 针对重复出现的问题，建立标准化应对流程；');
+    guidance.push('  · 对外勤/采购类阻塞事项，提前与对方确认时间表。');
+  }
+  // 5. 基于工作分布失衡建议
+  if(catStats){
+    const cats=Object.keys(catStats).sort((a,b)=>catStats[b].count-catStats[a].count);
+    if(cats.length>=2){
+      const top=cats[0],bottom=cats[cats.length-1];
+      const topCnt=catStats[top].count,bottomCnt=catStats[bottom].count;
+      if(topCnt>bottomCnt*3){
+        guidance.push('【结构优化】工作高度集中在「'+top+'」类（'+topCnt+' 项），而「'+bottom+'」类偏少（'+bottomCnt+' 项），建议下月适当平衡各类工作，避免单一方向过度倾斜。');
+      }
+    }
+  }
+  // 6. 超期任务提醒（已完成但超期太多，建议复盘）
+  const overdueDoneChains=allChains.filter(c=>c.isDone && c.isOverdue && (c.spanDays - c.planDays) >= 2);
+  if(overdueDoneChains.length>0){
+    guidance.push('【超期完成提醒】以下 '+overdueDoneChains.length+' 项任务虽已完成，但实际耗时明显超出计划，建议复盘：');
+    overdueDoneChains.slice(0,3).forEach(c=>{
+      guidance.push('  · '+(c.mainPlan||'').substring(0,30)+'：计划 '+c.planDays+' 天，实际 '+c.spanDays+' 天');
+    });
+  }
+  // 7. 通用建议
+  if(guidance.length===0){
+    guidance.push('【常规推进】本月工作整体平稳，建议下月继续保持现有节奏，同时主动寻找可优化点，提升工作产出质量。');
+  }
+  return guidance;
+}
+/* 构建跨天延续分析文本（用于报告正文） */
+function buildCrossDayAnalysisText(crossDayTasks){
+  if(!crossDayTasks||crossDayTasks.length===0){
+    return '本周期内未识别到跨天延续任务，工作多为当日完成，节奏紧凑。';
+  }
+  let text='共识别到 '+crossDayTasks.length+' 项跨天延续任务：\n';
+  crossDayTasks.forEach((c,i)=>{
+    text+='  '+(i+1)+'. 「'+(c.mainPlan||'').substring(0,30)+'」\n';
+    text+='     · 时间跨度：'+c.startDate+' 至 '+c.endDate+'（'+c.spanDays+'天，计划 '+c.planDays+' 天）';
+    text+=c.isOverdue?' [超期]':' [按计划]';
+    text+=c.isDone?' [已完成]':' [未完成]';
+    text+='\n';
+    if(!c.hasReason){
+      text+='     · ⚠ 延续原因未注明：记录人在续做时未写明为何延续，建议补充说明。\n';
+    }else{
+      text+='     · 延续原因已记录。\n';
+    }
+  });
+  return text;
+}
+/* ===================== 甘特图渲染 ===================== */
+/* 构建甘特图HTML */
+function buildGanttHTML(chains,periodStart,periodEnd){
+  if(!chains||chains.length===0){
+    return '<div style="font-size:13px;color:var(--text-light);text-align:center;padding:16px">暂无任务数据</div>';
+  }
+  const days=[];
+  const start=new Date(periodStart),end=new Date(periodEnd);
+  for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){
+    days.push(d.toISOString().slice(0,10));
+  }
+  const totalDays=days.length;
+  const dayWidth=100/totalDays;
+  const todayStr=new Date().toISOString().slice(0,10);
+  const statusColorMap={
+    'daily':'#6366f1','start':'#3b82f6','continue':'#f59e0b','end':'#10b981'
+  };
+  const statusLabelMap={'daily':'当日','start':'开始','continue':'持续','end':'结束'};
+  const PLAN_COLOR='#94a3b8';// slate-400 计划条颜色
+  const PLAN_PATTERN='repeating-linear-gradient(45deg,transparent 0,transparent 3px,rgba(255,255,255,.35) 3px,rgba(255,255,255,.35) 6px)';
+  let html='<div class="gantt-wrap"><div class="gantt-chart">';
+  html+='<div class="gantt-header"><div class="gantt-task-col" style="width:210px;min-width:210px">序号 / 任务名称</div>';
+  days.forEach(d=>{
+    const wd=new Date(d).getDay();
+    const isWk=(wd===0||wd===6);
+    const isToday=(d===todayStr);
+    html+='<div class="gantt-day-header'+(isWk?' weekend':'')+(isToday?' today':'')+'">'+d.slice(5).replace('-','/')+'</div>';
+  });
+  html+='</div>';
+  const sortedChains=chains.slice().sort((a,b)=>{
+    if(a.isImportant!==b.isImportant)return a.isImportant?-1:1;
+    if(a.isCrossDay!==b.isCrossDay)return a.isCrossDay?-1:1;
+    return a.startDate.localeCompare(b.startDate);
+  }).slice(0,15);
+  sortedChains.forEach((c,idx)=>{
+    // 计划条
+    const planStartIdx=Math.max(0,days.indexOf(c.planStartDate||c.startDate));
+    const planEndIdx=Math.min(totalDays-1,Math.max(planStartIdx,days.indexOf(c.planEndDate||c.endDate)));
+    const planStart=planStartIdx*dayWidth;
+    const planWidth=Math.max(dayWidth,(planEndIdx-planStartIdx+1)*dayWidth);
+    // 实际条
+    const actStartIdx=Math.max(0,days.indexOf(c.startDate));
+    const actEndIdx=Math.min(totalDays-1,Math.max(actStartIdx,days.indexOf(c.endDate)));
+    const actStart=actStartIdx*dayWidth;
+    const actWidth=Math.max(dayWidth,(actEndIdx-actStartIdx+1)*dayWidth);
+    const stColor=statusColorMap[c.taskStatus]||statusColorMap.daily;
+    const stLabel=statusLabelMap[c.taskStatus]||'';
+    let barText='';
+    if(c.isDone){barText='✓';}
+    else if(c.isOverdue){barText='超期';}
+    else{barText=stLabel;}
+    const star=c.isImportant?'<span class="gantt-star">★</span>':'';
+    const taskNo=String(idx+1).padStart(2,'0');
+    html+='<div class="gantt-row" style="min-height:56px">';
+    html+='<div class="gantt-task-name" style="width:210px;min-width:210px" title="'+esc(c.mainPlan)+'">';
+    html+='<span style="color:var(--text-light);font-weight:400">'+taskNo+'</span> ';
+    html+=star+esc((c.mainPlan||'').substring(0,18));
+    if(stLabel)html+=' <span style="background:'+stColor+';color:#fff;font-size:10px;padding:1px 5px;border-radius:3px">'+stLabel+'</span>';
+    html+='<div style="font-size:10px;color:var(--text-light);margin-top:2px">计划 '+esc(c.planStartDate||c.startDate).slice(5)+'~'+esc(c.planEndDate||c.endDate).slice(5)+'</div>';
+    html+='<div style="font-size:10px;color:var(--text-light);margin-top:1px">实际 '+esc(c.startDate).slice(5)+'~'+esc(c.endDate).slice(5)+(c.isOverdue?' <span style="color:#ef4444">(超期'+(c.spanDays-c.planDays)+'天)</span>':'')+'</div>';
+    html+='</div>';
+    html+='<div class="gantt-cells" style="min-height:56px">';
+    days.forEach(d=>{
+      const wd=new Date(d).getDay();
+      const isWk=(wd===0||wd===6);
+      html+='<div class="gantt-cell'+(isWk?' weekend':'')+'" style="min-height:56px"></div>';
+    });
+    // 计划条（上方，灰色斜纹）
+    html+='<div class="gantt-bar plan-bar" style="top:22%;transform:translateY(-50%);height:14px;opacity:.95;left:'+planStart+'%;width:'+planWidth+'%;background:'+PLAN_COLOR+';background-image:'+PLAN_PATTERN+'" title="计划：'+esc(c.planStartDate||c.startDate)+'~'+esc(c.planEndDate||c.endDate)+'（'+c.planDays+'天）">计</div>';
+    // 实际条（下方，按状态配色）
+    html+='<div class="gantt-bar act-bar" style="top:72%;transform:translateY(-50%);height:16px;left:'+actStart+'%;width:'+actWidth+'%;background:'+stColor+'" title="实际：'+esc(c.startDate)+'~'+esc(c.endDate)+' '+(c.isDone?'已完成':c.isOverdue?'超期':'进行中')+'">'+barText+'</div>';
+    html+='</div></div>';
+  });
+  html+='</div>';
+  html+='<div class="gantt-legend">';
+  html+='<div class="gantt-legend-item"><span class="gantt-legend-dot" style="background:#94a3b8;background-image:'+PLAN_PATTERN+';border:1px solid #64748b"></span>计划进度</div>';
+  html+='<div class="gantt-legend-item"><span class="gantt-legend-dot" style="background:#6366f1"></span>实际·当日任务</div>';
+  html+='<div class="gantt-legend-item"><span class="gantt-legend-dot" style="background:#3b82f6"></span>实际·开始</div>';
+  html+='<div class="gantt-legend-item"><span class="gantt-legend-dot" style="background:#f59e0b"></span>实际·持续</div>';
+  html+='<div class="gantt-legend-item"><span class="gantt-legend-dot" style="background:#10b981"></span>实际·结束</div>';
+  html+='<div class="gantt-legend-item"><span class="gantt-legend-dot" style="background:#ef4444"></span>超期/计划外</div>';
+  html+='</div></div>';
+  return html;
+}
+
+function buildMonthlyHTML(ym,data){
+  const pf=DB.get('profile',{});
+  const totalDays=data.length;
+  const fieldDays=data.filter(r=>r.field).length;
+  const restDays=data.filter(r=>r.isRestDay===true).length;
+  const workDays=totalDays-restDays;
+  let totalRecords=0;
+  let importantCount=0;
+  const weekStats={};
+  const allRecords=[]; // 扁平化所有工作记录
+  data.forEach(r=>{
+    const recs=(r.records||[]).filter(x=>x.plan||x.progress||x.result);
+    const c=recs.length;
+    totalRecords+=c;
+    importantCount+=recs.filter(x=>x.isImportant).length;
+    const wk=getWeekNum(new Date(r.date));
+    if(!weekStats[wk])weekStats[wk]={days:0,records:0,items:[],important:0};
+    weekStats[wk].days++;weekStats[wk].records+=c;
+    weekStats[wk].important+=recs.filter(x=>x.isImportant).length;
+    recs.forEach(x=>{
+      allRecords.push({date:r.date,week:wk,plan:x.plan,progress:x.progress,result:x.result,field:r.field,isImportant:!!x.isImportant,isRestDay:r.isRestDay===true});
+    });
+  });
+  const maxWk=Math.max(1,...Object.values(weekStats).map(s=>s.records));
+  const completed=data.flatMap(r=>(r.records||[]).filter(x=>x.progress&&(x.progress.includes('完成')||x.progress.includes('100'))));
+  const completeRate=totalRecords?Math.round(completed.length/totalRecords*100):0;
+  const inProgress=totalRecords-completed.length;
+  const catStats=buildCategoryStats(data);
+  const problems=extractProblems(data);
+  const fieldRecords=data.filter(r=>r.field).map(r=>({date:r.date,place:r.fieldPlace,note:r.fieldNote,records:r.records}));
+  const importantRecords=extractImportantRecords(data);
+  const linkage=analyzeWorkLinkage(data,importantRecords);
+  // 任务链分析
+  const chains=buildTaskChains(data);
+  const crossDayTasks=extractCrossDayTasks(chains);
+  const chainCompleteRate=calcChainCompleteRate(chains);
+  const chainDoneCount=chains.filter(c=>c.isDone).length;
+  const chainUndoneCount=chains.length-chainDoneCount;
+  const directionGuidance=generateDirectionGuidance(data,linkage,importantRecords,problems,catStats,crossDayTasks);
+  const catNames=Object.keys(catStats).sort((a,b)=>catStats[b].count-catStats[a].count);
+
+  let html=`
+  <div class="card">
+    <div class="card-title"><span class="emoji">📈</span>月报概览</div>
+    <div style="font-size:13px;color:var(--text-light);margin-bottom:10px">${ym}</div>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="num">${totalDays}</div><div class="lbl">记录天数</div></div>
+      <div class="stat-box"><div class="num">${totalRecords}</div><div class="lbl">工作条数</div></div>
+      <div class="stat-box"><div class="num" style="color:#b45309">${importantCount}</div><div class="lbl">重要任务</div></div>
+      <div class="stat-box"><div class="num">${completeRate}%</div><div class="lbl">完成率</div></div>
+    </div>
+    <h3>各周工作量</h3>
+    <div class="bar-chart">
+    ${Object.keys(weekStats).sort((a,b)=>a-b).map(wk=>`
+      <div class="bar-row">
+        <span class="bar-lbl">第${wk}周</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${weekStats[wk].records/maxWk*100}%"></div></div>
+        <span class="bar-val">${weekStats[wk].records}</span>
+      </div>`).join('')||'<div style="font-size:13px;color:var(--text-light)">本月暂无记录</div>'}
+    </div>
+  </div>`;
+
+  // ========== 月报正文（重点任务突出 + 普通任务简化 + 关联分析 + 方向指导） ==========
+  const companyPrefixM=pf.company?pf.company+' · ':'';
+  let text=`§T§${companyPrefixM}月度工作总结报告\n\n`;
+  text+=`§INFO§姓名|${pf.name||'-'}|部门|${pf.dept||'-'}|岗位|${pf.position||'-'}|报告月份|${ym}|报告日期|${todayStr()}\n\n`;
+
+  // 一、月度工作概况
+  text+=`§H§一、月度工作概况\n`;
+  text+=`§S§本月共出勤记录 ${totalDays} 天（其中工作日 ${workDays} 天，休息日 ${restDays} 天），累计完成工作事项 ${totalRecords} 项（含重要任务 ${importantCount} 项）。\n`;
+  text+=`§S§按任务链统计：本月共有 ${chains.length} 项任务，其中 ${chainDoneCount} 项已在月内完成，${chainUndoneCount} 项进行中/未完成，任务完成率 ${chainCompleteRate}%。\n`;
+  if(crossDayTasks.length>0){
+    const overdue=crossDayTasks.filter(c=>c.isOverdue);
+    const noReason=crossDayTasks.filter(c=>!c.hasReason);
+    text+=`§S§其中 ${crossDayTasks.length} 项为跨天延续任务`;
+    if(overdue.length>0)text+=`（${overdue.length} 项超期）`;
+    if(noReason.length>0)text+=`（${noReason.length} 项未注明延续原因）`;
+    text+=`。\n`;
+  }
+  text+=`§S§本月外勤工作 ${fieldDays} 天${fieldDays?`，占全月工作日 ${Math.round(fieldDays/totalDays*100)}%`:'无外勤记录'}。\n\n`;
+
+  // 二、重点任务专题（重要任务详列）
+  text+=`§H§二、重点任务专题（重要任务）\n`;
+  if(importantRecords.length===0){
+    text+=`§S§本月未标记重要任务。建议在日常记录时将关键工作标记为"重要任务"，以便月报重点突出。\n\n`;
+  }else{
+    text+=`§S§本月共标记重要任务 ${importantRecords.length} 项，按时间顺序梳理如下：\n\n`;
+    importantRecords.forEach((it,idx)=>{
+      const done=it.progress&&(it.progress.includes('完成')||it.progress.includes('100'));
+      text+=`§K§${idx+1}.【${it.date} ${weekdayCN(it.date)} · 第${it.week}周${it.field?' · 外勤':''}】${done?'✓ ':''}${it.plan||'（无计划内容）'}\n`;
+      if(it.progress)text+=`§P§§BL§进度：§EBL§${it.progress}\n`;
+      if(it.result)text+=`§R§§BL§成果：§EBL§${it.result}\n`;
+      text+='\n';
+    });
+  }
+
+  // 三、普通工作概览（按周简化展示，不逐条罗列）
+  text+=`§H§三、普通工作概览（按周汇总）\n`;
+  if(totalRecords-importantCount===0&&importantCount===0){
+    text+=`§S§本月暂无工作记录。\n\n`;
+  }else{
+    Object.keys(weekStats).sort((a,b)=>a-b).forEach(wk=>{
+      const ws=weekStats[wk];
+      const normalCnt=ws.records-ws.important;
+      const wkItems=allRecords.filter(x=>String(x.week)===String(wk)&&!x.isImportant);
+      text+=`§S§第 ${wk} 周（共 ${ws.days} 天，工作 ${ws.records} 项，其中重要 ${ws.important} 项，普通 ${normalCnt} 项）：\n`;
+      wkItems.slice(0,3).forEach(it=>{
+        text+=`§C§· ${it.date.slice(5)}：${(it.plan||'').substring(0,40)}${(it.plan||'').length>40?'...':''}\n`;
+      });
+      if(wkItems.length>3)text+=`§C§· 等共 ${wkItems.length} 项普通工作（详见每日记录）\n`;
+      if(wkItems.length===0&&ws.important>0)text+=`§C§· 本周工作均为重要任务，详见上节。\n`;
+      text+='\n';
+    });
+  }
+
+  // 四、工作分类汇总分析
+  text+=`§H§四、工作分类汇总分析\n`;
+  if(catNames.length===0){
+    text+=`§S§暂无分类数据。\n\n`;
+  }else{
+    catNames.forEach((cat,idx)=>{
+      const s=catStats[cat];
+      const rate=s.count?Math.round(s.done/s.count*100):0;
+      text+=`§S§${idx+1}. ${cat}类（共 ${s.count} 项，完成 ${s.done} 项，完成率 ${rate}%${s.important?`，含重要 ${s.important} 项`:''}）\n`;
+      s.items.slice(0,5).forEach(it=>{
+        let tags=[];
+        if(it.isImportant)tags.push('[重要]');
+        if(it.progress)tags.push('['+it.progress+']');
+        const tagStr=tags.length?'§GY§  '+tags.join(' ')+'§EGY§':'';
+        text+=`§C§· ${it.plan||'（未填写内容）'}${tagStr}\n`;
+      });
+      if(s.items.length>5)text+=`§C§· ...等共 ${s.items.length} 项\n`;
+      text+='\n';
+    });
+  }
+
+  // 五、工作关联分析（前因后果梳理）
+  text+=`§H§五、工作关联分析（前因后果梳理）\n`;
+  if(linkage.mainlines.length===0){
+    text+=`§S§本月工作较为分散，暂未识别出明显的工作主线。建议后续加强工作的连贯性与项目化推进。\n\n`;
+  }else{
+    text+=`§S§1. 工作主线识别：\n`;
+    linkage.mainlines.slice(0,3).forEach((m,i)=>{
+      text+=`§C§${i+1}) 「${m.category}」类工作贯穿 ${m.firstDate} 至 ${m.lastDate}（跨度 ${m.span} 天），累计 ${m.itemCount} 项，分布 ${m.dateCount} 个工作日，是本月核心工作方向。\n`;
+    });
+    text+='\n';
+    if(linkage.causalChains.length>0){
+      text+=`§S§2. 推进脉络与因果链：\n`;
+      linkage.causalChains.slice(0,2).forEach((c,i)=>{
+        text+=`§C§${i+1}) 「${c.category}」工作呈现"调研→行动→交付"推进路径：\n`;
+        if(c.research.length>0){
+          text+=`§C§  · 前期调研：${c.research.length} 项（如 ${c.research[0].date}：${(c.research[0].plan||'').substring(0,30)}）\n`;
+        }
+        if(c.action.length>0){
+          text+=`§C§  · 中期行动：${c.action.length} 项（如 ${c.action[0].date}：${(c.action[0].plan||'').substring(0,30)}）\n`;
+        }
+        if(c.delivery.length>0){
+          text+=`§C§  · 后期交付：${c.delivery.length} 项（如 ${c.delivery[0].date}：${(c.delivery[0].plan||'').substring(0,30)}）\n`;
+        }
+        text+='\n';
+      });
+    }
+    if(linkage.importantTrace.length>0){
+      text+=`§S§3. 重点任务推进脉络：\n`;
+      linkage.importantTrace.forEach(it=>{
+        text+=`§C§· ${it.date}：${(it.plan||'').substring(0,30)}${it.done?' ✓ 已完成':'（进行中）'}\n`;
+      });
+      text+='\n';
+    }
+  }
+
+  // 六、外勤工作专题汇总
+  text+=`§H§六、外勤工作专题汇总\n`;
+  if(fieldRecords.length===0){
+    text+=`§S§本月无外勤记录。\n\n`;
+  }else{
+    text+=`§S§本月外勤共计 ${fieldDays} 天，具体安排如下：\n\n`;
+    fieldRecords.forEach((f,idx)=>{
+      text+=`§D§${idx+1}. 【${f.date} ${weekdayCN(f.date)}】\n`;
+      if(f.place)text+=`§P§§BL§地点：§EBL§${f.place}\n`;
+      if(f.note)text+=`§P§§BL§事项：§EBL§${f.note}\n`;
+      const items=(f.records||[]).filter(x=>x.plan||x.result);
+      if(items.length>0){
+        text+=`§C§当日工作：\n`;
+        items.forEach(it=>{
+          let tags=[];
+          if(it.isImportant)tags.push('[重要]');
+          if(it.progress)tags.push('['+it.progress+']');
+          const tagStr=tags.length?'§GY§  '+tags.join(' ')+'§EGY§':'';
+          text+=`§C§· ${it.plan||'工作项'}${tagStr}\n`;
+        });
+      }
+      text+='\n';
+    });
+  }
+
+  // 七、存在问题与改进建议
+  text+=`§H§七、存在问题与改进建议\n`;
+  if(problems.length===0){
+    text+=`§S§本月工作整体顺利，暂无明显问题记录。建议持续保持，同时可主动思考流程优化点。\n\n`;
+  }else{
+    problems.forEach((p,idx)=>{
+      let tags=[];
+      if(p.isImportant)tags.push('[重要]');
+      const tagStr=tags.length?'§GY§  '+tags.join(' ')+'§EGY§':'';
+      text+=`§K§${idx+1}. 【${p.date}】${(p.plan||'相关工作')}${tagStr}\n`;
+      text+=`§P§§BL§情况：§EBL§${(p.desc||'').substring(0,80)}\n\n`;
+    });
+    text+=`§S§改进建议：\n`;
+    text+=`§C§· 针对未完成事项，梳理原因并制定追赶计划；\n`;
+    text+=`§C§· 对重复出现的问题，考虑建立标准化流程；\n`;
+    text+=`§C§· 对外勤密集时段，提前统筹路线与准备资料，提升外出效率。\n\n`;
+  }
+
+  // 八、下一步工作方向指导
+  text+=`§H§八、下一步工作方向指导\n`;
+  directionGuidance.forEach(g=>{ text+=`§S§${g}\n`; });
+  text+='\n';
+
+  // 九、月度工作亮点
+  text+=`§H§九、月度工作亮点\n`;
+  if(totalRecords===0){
+    text+=`§S§本月暂无记录。\n\n`;
+  }else{
+    let idx=1;
+    if(completeRate>=80)text+=`§S§${idx++}. 整体完成率达 ${completeRate}%，执行进度良好，交付稳定。\n`;
+    if(completed.length>=5)text+=`§S§${idx++}. 单月完成工作 ${completed.length} 项，产出效率较高。\n`;
+    if(importantCount>0)text+=`§S§${idx++}. 标记重要任务 ${importantCount} 项，工作重点明确，主次清晰。\n`;
+    const doneItems=allRecords.filter(x=>x.result&&x.result.length>10);
+    if(doneItems.length>0){
+      text+=`§S§${idx++}. 多项工作取得实质性成果：\n`;
+      doneItems.slice(0,3).forEach(it=>{
+        let tags=[];
+        if(it.isImportant)tags.push('[重要]');
+        const tagStr=tags.length?'§GY§  '+tags.join(' ')+'§EGY§':'';
+        text+=`§C§· ${it.plan||''.substring(0,20)}${(it.result||'').length>0?' → '+it.result.substring(0,40):''}${tagStr}\n`;
+      });
+    }
+    if(Object.keys(catStats).length>=3)text+=`§S§${idx++}. 工作覆盖面广，涉及 ${Object.keys(catStats).length} 个工作类别，综合能力提升。\n`;
+    if(idx===1)text+=`§S§1. 本月共记录 ${totalRecords} 项工作，日常工作稳步推进。\n`;
+    text+='\n';
+  }
+
+  // 十、下月工作计划
+  const monthKey=ym;
+  const savedMonthPlan=DB.get('plan_month_'+monthKey,'');
+  text+=`§H§十、下月工作计划\n`;
+  text+=(savedMonthPlan||'（请在下月计划输入区填写重点工作规划）').split('\n').map(l=>`§S§${l}`).join('\n')+'\n';
+
+  // ========== HTML 渲染 ==========
+  lastMonthlyRawText=text;
+  html+=`
+  <div class="card">
+    <div class="card-title"><span class="emoji">📄</span>月度工作总结报告</div>
+    <div class="report-text">${formatReportHTML(text)}</div>
+  </div>`;
+
+  // 重点任务卡片（突出展示）
+  if(importantRecords.length>0){
+    html+=`<div class="card" style="border-left:4px solid #f59e0b">
+    <div class="card-title" style="color:#b45309"><span class="emoji">⭐</span>重点任务专题（${importantRecords.length} 项）</div>
+    <div style="font-size:13px;line-height:1.7">
+    ${importantRecords.map(it=>{
+      const done=it.progress&&(it.progress.includes('完成')||it.progress.includes('100'));
+      return `<div style="margin-bottom:8px;padding:8px;background:#fffbeb;border-radius:8px">
+        <div style="font-weight:600;color:#92400e">${done?'✓':''}${esc(it.plan||'（无计划）')} <span style="font-size:11px;color:#a16207;font-weight:normal">${it.date} ${weekdayCN(it.date)}</span></div>
+        ${it.progress?`<div style="color:#666;margin-top:2px">进度：${esc(it.progress)}</div>`:''}
+        ${it.result?`<div style="color:#666;margin-top:2px">成果：${esc(it.result)}</div>`:''}
+      </div>`;
+    }).join('')}
+    </div>
+  </div>`;
+  }
+
+  // 工作关联分析卡片
+  html+=`<div class="card" style="border-left:4px solid var(--accent)">
+    <div class="card-title" style="color:#0e7490"><span class="emoji">🔗</span>工作关联分析</div>
+    <div style="font-size:13px;line-height:1.7">
+      ${buildLinkageHTML(linkage)}
+    </div>
+  </div>`;
+
+  // 甘特图卡片
+  if(chains.length>0){
+    const monthStart=ym+'-01';
+    const [yy,mm]=ym.split('-').map(Number);
+    const monthEnd=ym+'-'+String(new Date(yy,mm,0).getDate()).padStart(2,'0');
+    html+=`<div class="card">
+    <div class="card-title"><span class="emoji">📅</span>任务甘特图</div>
+    ${buildGanttHTML(chains,monthStart,monthEnd)}
+    </div>`;
+  }
+
+  // 下一步方向指导卡片
+  html+=`<div class="card" style="border-left:4px solid var(--success);background:linear-gradient(135deg,#ecfdf5,#d1fae5)">
+    <div class="card-title" style="color:#065f46"><span class="emoji">🧭</span>下一步工作方向指导</div>
+    <div style="font-size:13px;line-height:1.8">
+      ${directionGuidance.map(g=>'<div style="margin-bottom:6px">'+esc(g)+'</div>').join('')}
+    </div>
+  </div>`;
+
+  html+=`
+  <div class="card summary-card">
+    <div class="card-title"><span class="emoji">💡</span>月度智能分析</div>
+    <div style="font-size:13px;line-height:1.7">
+      ${generateMonthAnalysis(totalDays,totalRecords,fieldDays,chainCompleteRate,weekStats,catStats,problems,importantCount,crossDayTasks)}
+    </div>
+  </div>`;
+
+  // 工作分类卡片
+  if(catNames.length>0){
+    html+=`<div class="card">
+    <div class="card-title"><span class="emoji">🗂️</span>工作分类统计</div>
+    <div class="stat-grid">
+    ${catNames.map(cat=>{
+      const s=catStats[cat];
+      const rate=s.count?Math.round(s.done/s.count*100):0;
+      return `<div class="stat-box"><div class="num" style="font-size:20px">${s.count}</div><div class="lbl" style="font-size:12px">${cat}<br>完成率 ${rate}%${s.important?` · 重要 ${s.important}`:''}</div></div>`;
+    }).join('')}
+    </div>
+  </div>`;
+  }
+
+  html+=`
+  <div class="card">
+    <div class="card-title"><span class="emoji">📝</span>下月计划</div>
+    <div class="field" style="margin-bottom:10px">
+      <textarea id="monthlyPlanInput" placeholder="请填写下月重点工作规划，每行一项..." style="min-height:110px">${esc(savedMonthPlan)}</textarea>
+    </div>
+    <button class="btn btn-primary" onclick="saveMonthlyPlan('${monthKey}')">💾 保存下月计划</button>
+  </div>
+  <div class="btn-row" style="margin-bottom:14px">
+    <button class="btn btn-success" onclick="exportReport('monthly','csv')">📊 导出甘特图</button>
+    <button class="btn btn-primary" onclick="exportReport('monthly','doc')">📄 导出文档</button>
+  </div>`;
+  return html;
+}
+function buildLinkageHTML(linkage){
+  if(linkage.mainlines.length===0){
+    return '<div style="color:var(--text-light)">本月工作较为分散，暂未识别出明显的工作主线。建议后续加强工作的连贯性与项目化推进。</div>';
+  }
+  let html='<div style="margin-bottom:12px"><strong>工作主线：</strong></div>';
+  linkage.mainlines.slice(0,3).forEach((m,i)=>{
+    html+=`<div style="margin-bottom:6px">• 「${esc(m.category)}」贯穿 ${m.firstDate} 至 ${m.lastDate}（${m.span} 天），${m.itemCount} 项，${m.dateCount} 个工作日</div>`;
+  });
+  if(linkage.causalChains.length>0){
+    html+='<div style="margin:12px 0 8px"><strong>推进脉络（调研→行动→交付）：</strong></div>';
+    linkage.causalChains.slice(0,2).forEach((c,i)=>{
+      html+=`<div style="margin-bottom:8px;padding:8px;background:#f0f9ff;border-radius:8px">`;
+      html+=`<div style="font-weight:600;color:#0e7490">「${esc(c.category)}」</div>`;
+      if(c.research.length>0)html+=`<div style="font-size:12px;color:#666;margin-top:3px">调研期：${c.research.length} 项（${c.research[0].date} 起）</div>`;
+      if(c.action.length>0)html+=`<div style="font-size:12px;color:#666">行动期：${c.action.length} 项</div>`;
+      if(c.delivery.length>0)html+=`<div style="font-size:12px;color:#666">交付期：${c.delivery.length} 项（${c.delivery[c.delivery.length-1].date} 止）</div>`;
+      html+=`</div>`;
+    });
+  }
+  if(linkage.importantTrace.length>0){
+    html+='<div style="margin:12px 0 8px"><strong>重点任务推进：</strong></div>';
+    linkage.importantTrace.slice(0,6).forEach(it=>{
+      const dot=it.done?'✓':'○';
+      html+=`<div style="font-size:12px;color:#666;margin-bottom:3px">${dot} ${it.date}：${esc((it.plan||'').substring(0,30))}${it.done?' <span style="color:#10b981">已完成</span>':' <span style="color:#f59e0b">进行中</span>'}</div>`;
+    });
+  }
+  return html;
+}
+function saveMonthlyPlan(monthKey){
+  const v=document.getElementById('monthlyPlanInput').value;
+  DB.set('plan_month_'+monthKey,v);
+  Cloud.scheduleUpload('保存下月计划');
+  showToast('✓ 下月计划已保存');
+}
+function generateMonthAnalysis(days,records,field,rate,weeks,catStats,problems,importantCount,crossDayTasks){
+  importantCount=importantCount||0;
+  let tips=[];
+  if(days===0)tips.push('本月尚未记录工作内容。');
+  else{
+    const avg=records/days;
+    tips.push('日均工作量 '+avg.toFixed(1)+' 项，共 '+Object.keys(weeks).length+' 周有记录。');
+    if(importantCount>0){
+      const impRate=records?Math.round(importantCount/records*100):0;
+      tips.push('重要任务 '+importantCount+' 项，占比 '+impRate+'%，工作重点突出。');
+    }else{
+      tips.push('本月未标记重要任务，建议日常记录时标注关键工作以便月报重点呈现。');
+    }
+    if(rate>=80)tips.push('任务链完成率 '+rate+'%（按任务最终状态统计），整体执行情况良好。');
+    else if(rate>=60)tips.push('任务链完成率 '+rate+'%，部分任务仍在推进，需关注后续进展。');
+    else tips.push('任务链完成率 '+rate+'%，较多任务未在月内完成，建议复盘延期原因。');
+    if(crossDayTasks&&crossDayTasks.length>0){
+      const overdue=crossDayTasks.filter(c=>c.isOverdue);
+      const noReason=crossDayTasks.filter(c=>!c.hasReason);
+      const undone=crossDayTasks.filter(c=>!c.isDone);
+      let tip='跨天任务 '+crossDayTasks.length+' 项';
+      if(overdue.length>0)tip+='，超期 '+overdue.length+' 项';
+      if(noReason.length>0)tip+='，'+noReason.length+' 项未注明延续原因';
+      if(undone.length>0)tip+='，'+undone.length+' 项未完成';
+      tips.push(tip+'，建议关注任务计划天数设定的合理性。');
+    }
+    // 最忙的周
+    let busyWk='',busyCnt=0;
+    for(const w in weeks){if(weeks[w].records>busyCnt){busyCnt=weeks[w].records;busyWk=w;}}
+    if(busyWk)tips.push('第 '+busyWk+' 周工作量最大（'+busyCnt+' 项），可分析高峰原因并提前规划。');
+    if(field>5)tips.push('外勤较多（'+field+' 天），建议提前统筹路线与资料，提升外出效率。');
+    // 工作分布
+    if(catStats){
+      const cats=Object.keys(catStats).sort((a,b)=>catStats[b].count-catStats[a].count);
+      if(cats.length>0){
+        const top=cats[0];
+        tips.push('主要工作集中在「'+top+'」类（'+catStats[top].count+' 项），占据本月核心精力。');
+      }
+      if(cats.length>=3)tips.push('工作覆盖面广（'+cats.length+' 类），综合能力持续锻炼。');
+    }
+    // 问题提示
+    if(problems&&problems.length>0){
+      tips.push('识别到 '+problems.length+' 条待改进事项，建议重点关注并形成改进措施。');
+    }
+  }
+  return tips.map(t=>'• '+t).join('<br>');
+}
+
+/* ===================== 导出功能 ===================== */
+function exportReport(type,fmt){
+  let data,text,prefix,periodStart,periodEnd;
+  if(type==='weekly'){
+    const wp=document.getElementById('weekPicker').value;
+    const [y,w]=wp.split('-W');
+    const mon=mondayOfISOWeek(parseInt(y),parseInt(w));
+    const start=fmtDate(mon);const end=fmtDate(new Date(mon.getTime()+6*86400000));
+    data=getAllRecords().filter(r=>r.date>=start&&r.date<=end).sort((a,b)=>a.date.localeCompare(b.date));
+    prefix='周报_'+start+'_'+end;
+    periodStart=start;periodEnd=end;
+    let weeklyText=lastWeeklyRawText;
+    const planInput=document.getElementById('weeklyPlanInput');
+    if(planInput){
+      const pv=planInput.value.trim();
+      const planContent=(pv||'（请补充下周重点工作安排）').replace(/\n/g,'\n  ');
+      weeklyText=weeklyText.replace(/四、下周计划\n[\s\S]*$/,'四、下周计划\n  '+planContent+'\n');
+    }
+    text=weeklyText;
+  }else{
+    const ym=document.getElementById('monthPicker').value;
+    const [y,m]=ym.split('-').map(Number);
+    const start=ym+'-01';const end=ym+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0');
+    data=getAllRecords().filter(r=>r.date>=start&&r.date<=end).sort((a,b)=>a.date.localeCompare(b.date));
+    prefix='月报_'+ym;
+    periodStart=start;periodEnd=end;
+    let monthlyText=lastMonthlyRawText;
+    const planInput=document.getElementById('monthlyPlanInput');
+    if(planInput){
+      const pv=planInput.value.trim();
+      const planContent=(pv||'（请在下月计划输入区填写重点工作规划）').replace(/\n/g,'\n  ');
+      monthlyText=monthlyText.replace(/十、下月工作计划\n[\s\S]*$/,'十、下月工作计划\n  '+planContent+'\n');
+    }
+    text=monthlyText;
+  }
+  if(fmt==='csv')downloadGantt(data,prefix,periodStart,periodEnd);
+  else downloadDOC(text,prefix);
+}
+/* 导出甘特图（HTML表格，可用Excel打开） */
+function downloadGantt(data,prefix,periodStart,periodEnd){
+  const pf=DB.get('profile',{});
+  const chains=buildTaskChains(data);
+  if(chains.length===0){showToast('暂无任务数据，无法导出甘特图');return;}
+  const days=[];
+  const start=new Date(periodStart),end=new Date(periodEnd);
+  for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){
+    days.push(d.toISOString().slice(0,10));
+  }
+  const statusColorMap={'daily':'#6366f1','start':'#3b82f6','continue':'#f59e0b','end':'#10b981'};
+  const statusLabelMap={'daily':'当日任务','start':'持续·开始','continue':'持续·中','end':'持续·结束'};
+  let html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(prefix)+'_甘特图</title>';
+  html+='<style>';
+  html+='body{font-family:"Microsoft YaHei","微软雅黑",sans-serif;padding:25px 30px;background:#fff;color:#1f2937}';
+  html+='h2{text-align:center;margin-bottom:6px;font-size:20px;color:#1f2937;letter-spacing:3px}';
+  html+='.info{text-align:center;color:#6b7280;margin-bottom:18px;font-size:12px;border-bottom:1px solid #e5e7eb;padding-bottom:10px}';
+  html+='table{border-collapse:collapse;width:100%;font-size:11px}';
+  html+='th,td{border:1px solid #d1d5db;padding:5px 7px;text-align:center;white-space:nowrap}';
+  html+='th{background:#374151;color:#fff;font-weight:600;font-size:11px}';
+  html+='th.weekend{background:#92400e}';
+  html+='th.sub{background:#6b7280;font-size:10px;font-weight:500}';
+  html+='td.weekend{background:#fef3c7}';
+  html+='td.task-name{text-align:left;background:#fff;min-width:160px;max-width:250px;white-space:normal;word-break:break-all;vertical-align:middle}';
+  html+='td.phase-label{background:#f3f4f6;color:#374151;font-weight:600;text-align:center;vertical-align:middle}';
+  html+='td.bar-done{background:#10b981;color:#fff;font-weight:600}';
+  html+='td.bar-progress{background:#f59e0b;color:#fff;font-weight:600}';
+  html+='td.bar-start{background:#3b82f6;color:#fff;font-weight:600}';
+  html+='td.bar-end{background:#10b981;color:#fff;font-weight:600}';
+  html+='td.bar-daily{background:#6366f1;color:#fff;font-weight:600}';
+  html+='td.bar-late{background:#ef4444;color:#fff;font-weight:600}';
+  html+='td.bar-plan{background:#94a3b8;color:#fff;font-weight:600}';/* 灰=计划 */
+  html+='td.bar-plan2{background:#cbd5e1;color:#475569;font-weight:600}';/* 淡灰=计划空白格 */
+  html+='td.empty{background:#fafafa}';
+  html+='td.seq{background:#f9fafb;color:#6b7280;font-weight:600;text-align:center;min-width:28px;vertical-align:middle}';
+  html+='td.type-cell{text-align:center;min-width:70px;font-weight:600;vertical-align:middle}';
+  html+='.legend{margin-top:18px;font-size:11px;color:#6b7280;text-align:center}';
+  html+='.legend span{display:inline-block;margin:0 8px;padding:3px 10px;border-radius:3px;color:#fff;font-weight:600}';
+  html+='table.detail{margin-top:25px}';
+  html+='table.detail th{background:#374151;font-size:11px}';
+  html+='table.detail td{text-align:left;font-size:11px}';
+  html+='table.detail td.center{text-align:center}';
+  html+='table.detail tr:nth-child(even){background:#f9fafb}';
+  html+='</style></head><body>';
+  html+='<h2>'+(pf.company?esc(pf.company)+' · ':'')+'工作任务甘特图</h2>';
+  html+='<div class="info">';
+  html+='姓名：'+esc(pf.name||'-')+'　';
+  html+='部门：'+esc(pf.dept||'-')+'　';
+  html+='岗位：'+esc(pf.position||'-')+'　';
+  html+='周期：'+periodStart+' 至 '+periodEnd+'　';
+  html+='导出日期：'+todayStr();
+  html+='</div>';
+  // 甘特图表格（双行：计划+实际）
+  html+='<table><thead>';
+  // 第一行大表头
+  html+='<tr>';
+  html+='<th rowspan="2" style="min-width:28px">序号</th>';
+  html+='<th rowspan="2" style="min-width:160px">任务名称</th>';
+  html+='<th colspan="'+(days.length+2)+'">时间进度（灰=计划  /  颜色=实际）</th>';
+  html+='</tr>';
+  // 第二行：阶段标签 + 日期
+  html+='<tr>';
+  html+='<th class="sub" style="min-width:62px">阶段</th>';
+  html+='<th class="sub" style="min-width:68px">类型</th>';
+  days.forEach(d=>{
+    const wd=new Date(d).getDay();
+    const isWk=(wd===0||wd===6);
+    html+='<th class="sub '+(isWk?'weekend':'')+'">'+d.slice(5).replace('-','/')+'</th>';
+  });
+  html+='</tr></thead><tbody>';
+  const sortedChains=chains.slice().sort((a,b)=>{
+    if(a.isImportant!==b.isImportant)return a.isImportant?-1:1;
+    if(a.isCrossDay!==b.isCrossDay)return a.isCrossDay?-1:1;
+    return a.startDate.localeCompare(b.startDate);
+  });
+  sortedChains.forEach((c,idx)=>{
+    const taskNo=String(idx+1).padStart(2,'0');
+    const taskName=(c.isImportant?'★ ':'')+esc(c.mainPlan||'').substring(0,35);
+    const stColor=statusColorMap[c.taskStatus]||statusColorMap.daily;
+    const stLabel=statusLabelMap[c.taskStatus]||'';
+    const stClass='bar-'+(c.taskStatus||'daily');
+    // 计划行
+    const planStartIdx=Math.max(0,days.indexOf(c.planStartDate||c.startDate));
+    const planEndIdx=Math.min(days.length-1,Math.max(planStartIdx,days.indexOf(c.planEndDate||c.endDate)));
+    html+='<tr>';
+    html+='<td class="seq" rowspan="2">'+taskNo+'</td>';
+    html+='<td class="task-name" rowspan="2">'+taskName+'</td>';
+    html+='<td class="phase-label">计划</td>';
+    html+='<td class="type-cell" style="color:#64748b">'+c.planDays+'天</td>';
+    days.forEach((d,di)=>{
+      const wd=new Date(d).getDay();
+      const isWk=(wd===0||wd===6);
+      if(di>=planStartIdx&&di<=planEndIdx){
+        html+='<td class="bar-plan">'+(di===planStartIdx?'计':'')+'</td>';
+      }else{
+        html+='<td class="'+(isWk?'weekend':'empty')+'"></td>';
+      }
+    });
+    html+='</tr>';
+    // 实际行
+    const actStartIdx=Math.max(0,days.indexOf(c.startDate));
+    const actEndIdx=Math.min(days.length-1,Math.max(actStartIdx,days.indexOf(c.endDate)));
+    html+='<tr>';
+    html+='<td class="phase-label" style="background:#dbeafe;color:#1e3a8a">实际</td>';
+    html+='<td class="type-cell" style="color:'+stColor+'">'+stLabel+'</td>';
+    days.forEach((d,di)=>{
+      const wd=new Date(d).getDay();
+      const isWk=(wd===0||wd===6);
+      if(di>=actStartIdx&&di<=actEndIdx){
+        let barClass=stClass,barText='';
+        if(c.isDone){barClass='bar-done';barText='✓';}
+        else if(c.isOverdue){barClass='bar-late';barText='超期';}
+        else{barText=(di===actStartIdx)?'实':'';}
+        html+='<td class="'+barClass+'">'+barText+'</td>';
+      }else{
+        html+='<td class="'+(isWk?'weekend':'empty')+'"></td>';
+      }
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table>';
+  // 图例
+  html+='<div class="legend">';
+  html+='<span style="background:#94a3b8">计划进度</span>';
+  html+='<span style="background:#6366f1">实际·当日任务</span>';
+  html+='<span style="background:#3b82f6">实际·开始</span>';
+  html+='<span style="background:#f59e0b">实际·持续</span>';
+  html+='<span style="background:#10b981">实际·结束</span>';
+  html+='<span style="background:#ef4444">超期/计划外</span>';
+  html+='</div>';
+  // 任务详情表（新增计划日期列）
+  html+='<table class="detail"><thead><tr>';
+  html+='<th>序号</th><th>任务名称</th><th>类型</th><th>计划开始</th><th>计划结束</th><th>实际开始</th><th>实际结束</th><th>计划天数</th><th>实际天数</th><th>状态</th><th>重要</th><th>超期天数</th>';
+  html+='</tr></thead><tbody>';
+  sortedChains.forEach((c,i)=>{
+    const status=c.isDone?'已完成':(c.isOverdue?'超期':'进行中');
+    const stLabel=statusLabelMap[c.taskStatus]||'';
+    const stColor=statusColorMap[c.taskStatus]||'#6366f1';
+    const overdueDays=(c.isOverdue?(c.spanDays-c.planDays):0);
+    html+='<tr>';
+    html+='<td class="center">'+(i+1)+'</td>';
+    html+='<td>'+esc(c.mainPlan||'').substring(0,45)+'</td>';
+    html+='<td class="center" style="color:'+stColor+';font-weight:600">'+stLabel+'</td>';
+    html+='<td class="center">'+(c.planStartDate||c.startDate)+'</td>';
+    html+='<td class="center">'+(c.planEndDate||c.endDate)+'</td>';
+    html+='<td class="center">'+c.startDate+'</td>';
+    html+='<td class="center">'+c.endDate+'</td>';
+    html+='<td class="center">'+c.planDays+'</td>';
+    html+='<td class="center">'+c.spanDays+'</td>';
+    html+='<td class="center">'+status+'</td>';
+    html+='<td class="center">'+(c.isImportant?'★':'')+'</td>';
+    html+='<td class="center" style="color:'+(overdueDays>0?'#ef4444':'inherit')+';font-weight:600">'+(overdueDays>0?overdueDays:'-')+'</td>';
+    html+='</tr>';
+  });
+  html+='</tbody></table>';
+  html+='</body></html>';
+  const blob=new Blob(['\ufeff',html],{type:'application/vnd.ms-excel'});
+  triggerDownload(blob,prefix+'_甘特图.xls');
+  showToast('✓ 已导出 '+prefix+'_甘特图.xls');
+}
+function downloadCSV(data,prefix){
+  const pf=DB.get('profile',{});
+  let rows=[];
+  rows.push([(pf.company||'')+'工作周报记录表']);
+  rows.push(['公司',pf.company||'','姓名',pf.name||'','部门',pf.dept||'','岗位',pf.position||'']);
+  rows.push(['日期','星期','是否休息日','是否外勤','外勤地点','外勤事项','是否重要任务','计划天数','是否关联任务','工作计划/内容','完成进度','工作成果/备注']);
+  data.forEach(r=>{
+    const isRest=r.isRestDay===true;
+    const recs=(r.records||[]).filter(x=>x.plan||x.progress||x.result);
+    if(recs.length===0){
+      // 仅休息日记录
+      rows.push([r.date,weekdayCN(r.date),isRest?'是':'否',r.field?'是':'否',r.fieldPlace||'',r.fieldNote||'','','','','休息日','',isRest?'休息日':'']);
+    }else{
+      recs.forEach(x=>{
+        rows.push([r.date,weekdayCN(r.date),isRest?'是':'否',r.field?'是':'否',r.fieldPlace||'',r.fieldNote||'',x.isImportant?'★重要':'',x.planDays||1,x.linkedTaskId?'续':''  ,x.plan||'',x.progress||'',x.result||'']);
+      });
+    }
+  });
+  const csv='\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  triggerDownload(blob,prefix+'.csv');
+  showToast('✓ 已导出 '+prefix+'.csv');
+}
+function downloadDOC(text,prefix){
+  const F='微软雅黑,Microsoft YaHei,sans-serif';
+  const lines=text.split('\n');
+  let bodyHTML='';
+  for(const rawLine of lines){
+    if(rawLine===''){bodyHTML+='<p style="margin:0;line-height:1.2">&nbsp;</p>\n';continue}
+    let line=rawLine;
+    let style='';let extra='';
+
+    // Determine line type and strip prefix marker
+    if(line.startsWith('§T§')){
+      line=line.slice(3);
+      style=`text-align:center;font-size:20pt;color:#1F4E79;font-weight:bold;font-family:${F};margin:0 0 10pt 0`;
+    }else if(line.startsWith('§INFO§')){
+      // Info table: pipe-delimited key|value pairs
+      line=line.slice(6);
+      const pairs=line.split('|');
+      let rows='';
+      for(let i=0;i<pairs.length;i+=2){
+        const k=pairs[i]||'';
+        const v=pairs[i+1]||'';
+        rows+=`<tr><td style="background:#1F4E79;color:#FFFFFF;font-weight:bold;text-align:center;font-family:${F};font-size:10.5pt;padding:3pt 8pt;width:15%">${esc(k)}</td><td style="color:#222222;text-align:center;font-family:${F};font-size:10.5pt;padding:3pt 8pt">${esc(v)}</td></tr>`;
+      }
+      bodyHTML+=`<table border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;margin:4pt 0 8pt 0">${rows}</table>\n`;
+      continue;
+    }else if(line.startsWith('§H§')){
+      line=line.slice(3);
+      style=`font-size:14pt;color:#1F4E79;font-weight:bold;font-family:${F};margin:10pt 0 4pt 0`;
+    }else if(line.startsWith('§D§')){
+      line=line.slice(3);
+      style=`font-size:12pt;color:#2E75B6;font-weight:bold;font-family:${F};margin:8pt 0 2pt 0`;
+    }else if(line.startsWith('§K§')){
+      line=line.slice(3);
+      style=`font-size:11pt;color:#222222;font-weight:bold;font-family:${F};margin:3pt 0 1pt 0;text-indent:0;padding-left:11.35pt`;
+    }else if(line.startsWith('§P§')){
+      line=line.slice(3);
+      style=`font-size:10.5pt;color:#222222;font-family:${F};margin:0 0 1pt 0;padding-left:28.35pt`;
+    }else if(line.startsWith('§R§')){
+      line=line.slice(3);
+      style=`font-size:10.5pt;color:#222222;font-family:${F};margin:0 0 1pt 0;padding-left:28.35pt`;
+    }else if(line.startsWith('§S§')){
+      line=line.slice(3);
+      style=`font-size:11pt;color:#222222;font-family:${F};margin:0 0 3pt 0;padding-left:5.65pt;line-height:1.56`;
+    }else if(line.startsWith('§C§')){
+      line=line.slice(3);
+      style=`font-size:11pt;color:#222222;font-family:${F};margin:0;padding-left:11.35pt`;
+    }else{
+      style=`font-size:10.5pt;color:#222222;font-family:${F};margin:0;line-height:1.2`;
+    }
+
+    // Process inline markers
+    let html=esc(line)
+      .replace(/§BL§/g,'<span style="color:#2E75B6;font-weight:bold">')
+      .replace(/§EBL§/g,'</span>')
+      .replace(/§GY§/g,'<span style="font-size:9pt;color:#595959;font-weight:normal">')
+      .replace(/§EGY§/g,'</span>')
+      .replace(/§RED§/g,'<span style="color:#FF0000;font-weight:bold">')
+      .replace(/§END§/g,'</span>')
+      .replace(/§B§/g,'<span style="font-weight:bold">')
+      .replace(/§EB§/g,'</span>')
+      .replace(/§CENTER§/g,'')
+      .replace(/§ECENTER§/g,'');
+
+    bodyHTML+=`<p style="${style}">${html}</p>\n`;
+  }
+  const html=`<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"><title>${prefix}</title>
+<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->
+<style>
+@page WordSection1{margin:72pt 72pt}
+div.WordSection1{page:WordSection1}
+p{margin:0;padding:0}
+body{margin:0}
+table{border-collapse:collapse}
+</style>
+</head>
+<body><div class="WordSection1">
+${bodyHTML}
+</div></body></html>`;
+  const blob=new Blob(['\ufeff',html],{type:'application/msword'});
+  triggerDownload(blob,prefix+'.doc');
+  showToast('✓ 已导出 '+prefix+'.doc');
+}
+function triggerDownload(blob,name){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(a.href);},100);
+}
+function exportAllCSV(){
+  const data=getAllRecords();
+  if(data.length===0){showToast('暂无数据可导出');return;}
+  downloadCSV(data,'全部工作记录_'+todayStr());
+}
+
+/* ===================== 清空 ===================== */
+function clearAllData(){
+  if(!confirm('确定清空所有工作记录、岗位信息及计划吗？此操作不可恢复！'))return;
+  const idx=DB.get('dateIndex',[]);
+  idx.forEach(d=>DB.del('daily_'+d));
+  DB.del('dateIndex');DB.del('profile');
+  Object.keys(localStorage).filter(k=>k.startsWith('wr_plan_')).forEach(k=>localStorage.removeItem(k));
+  showToast('已清空所有数据');
+  setTimeout(()=>location.reload(),800);
+}
+
+/* ===================== Toast ===================== */
+let toastTimer;
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+/* ===================== 启动 ===================== */
+window.addEventListener('DOMContentLoaded',()=>{
+  renderLockScreen();
+  document.getElementById('pwdInput').addEventListener('keydown',e=>{if(e.key==='Enter')unlockByPwd();});
+  // 点击遮罩关闭弹窗
+  document.getElementById('settingsModal').addEventListener('click',e=>{
+    if(e.target.id==='settingsModal')closeSettings();
+  });
+  document.getElementById('cloudModal').addEventListener('click',e=>{
+    if(e.target.id==='cloudModal')closeCloudConfig();
+  });
+});
+</script>
+</body>
+</html>
